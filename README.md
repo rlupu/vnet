@@ -3,10 +3,10 @@
 
 <p>This script creates the virtual IPv4 network with a predefined topology composed of 3 interconnected subnetwork 
 domains required by further labs activities. The subnets are: 10.0.1.0/24, 10.0.2.0/24 and 10.0.3.0/24. 
-Access to the Internet is provided via eth0 interface of the "host" machine. </br>
+Access to the Internet is provided via eth0 interface of the Host machine. </br>
 Run it with no arg to set up the virtual network.  </p>
 
-<p>3 terminals will be launched relying on screen program (see screen documentation). </p>
+<p>Three virtual terminals will be launched relying on screen program (see screen documentation). </p>
 
 <p>Developed and tested with Bash shell on WSL2 Debian platform. </p>
 
