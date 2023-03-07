@@ -8,4 +8,21 @@ Run it with no arg to set up the virtual network.  </p>
 
 <p>3 terminals will be launched relying on screen program (see screen documentation). </p>
 
-<p>Developed and tested with Bash shell on Debian platform. </p>
+<p>Developed and tested with Bash shell on WSL2 Debian platform. </p>
+
+
+
+	      .1  (10.0.10/24)  .2	      .2  (10.0.2.0/24)  .1
+	| H1 | ------------------ |  Router  | ------------------- | H2 |
+	   veth0_h1     veth0_router	|   veth1_router          veth0_h2
+					| veth2_router
+					| .2
+					| (10.0.3.0/24)
+					|
+					|
+			     	   | Default |
+					| eth0
+					|
+					|
+					|
+				    Internet
