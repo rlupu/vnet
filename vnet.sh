@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Copyright (C) <year>  <name of author>
+# Copyright (C) 2023 R. Lupu 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,9 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Author:	R. Lupu (rlupu@elcom.pub.ro)
+# Contact:	rlupu@elcom.pub.ro
 #
-# Date:		Feb-Mar. 2023
 # Version:	0.2 (Debian)
 #
 
@@ -33,7 +32,7 @@ while getopts ":hlr" option; do
 		   echo "Usage: vnet.sh [ {-h, -l, -r} ] "
 		   echo -e "   -h\tThis help."
 		   echo -e "   -l\tList all user-defined net namespaces."
-		   echo -e "   -r\tRemove all virtual nets and terms.\n"
+		   echo -e "   -r\tRemove all virtual nets and terminals.\n"
                    exit
 		   ;;
 		l) #list all existing namespaces, terms, etc.
