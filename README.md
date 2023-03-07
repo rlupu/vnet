@@ -20,7 +20,7 @@ Run it with no arg to set up the virtual network.  </p>
 					| (10.0.3.0/24)
 					|
 					| veth0
-			     	    | Guest |
+			     	    | Host |
 					| eth0
 					|
 					|
