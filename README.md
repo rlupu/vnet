@@ -6,7 +6,8 @@ domains required by further labs activities. The subnets are: 10.0.1.0/24, 10.0.
 Access to the Internet is provided via eth0 interface of the Host machine. </br>
 Run it with no arg to set up the virtual network.  </p>
 
-<p>Three virtual terminals will be launched relying on screen program (see screen documentation). </p>
+<p>Three virtual terminals will be launched relying on screen program (see screen documentation). So far, the 
+following commands are supported: ifconfig, route, ip, iptables, ping, tcpdump, scapy3, hping3, wget, ssh.</p>
 
 <p>Developed and tested with Bash shell on WSL2 Debian platform. </p>
 
