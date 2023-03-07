@@ -2,7 +2,7 @@
 
 # TODO:		1) ... 
 #
-# Author:	rlupu @ UPB
+# Author:	R. Lupu (rlupu@elcom.pub.ro)
 # Date:		Feb-Mar. 2023
 # Version:	0.2 (Debian)
 
