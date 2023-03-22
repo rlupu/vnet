@@ -29,7 +29,7 @@ while getopts ":hlr" option; do
 		   echo "It is implemented based on linux namespace technology. Run it w/o any arg to set up "
 		   echo "the required net domains and related IP interconnectivity. 3 terms will be launched "
 		   echo "relying on screen program (see screen documentation). "
-		   echo "Usage: vnet.sh [ {-h, -l, -r} ] "
+		   echo "Usage: vnet.sh [ {-h, -l, -r} ] | <json file>"
 		   echo -e "   -h\tThis help."
 		   echo -e "   -l\tList all user-defined net namespaces."
 		   echo -e "   -r\tRemove all virtual nets and terminals.\n"
@@ -89,19 +89,25 @@ else
 	exit
 fi
 
+if  ! ( [ $# -ne 0 ] && [ -f "./$1" ] ); then
+	echo -e "json network input file not found or not specified!\nQuit."
+	exit
+fi
+
+
 echo "Setup and configure the virtual network entities (i.e. namespaces):"
-ENDPOINTS_NAMES="$(get_endpoints lab.json | get_hostname)"
+ENDPOINTS_NAMES="$(get_endpoints $1 | get_hostname)"
 #echo $ENDPOINTS_NAMES
 
-ROUTERS_NAMES="$(get_routers lab.json | get_hostname)"
+ROUTERS_NAMES="$(get_routers $1 | get_hostname)"
 #echo $ROUTERS_NAMES
 
-GATEWAY_NAME="$(get_gateways lab.json | get_hostname)"
+GATEWAY_NAME="$(get_gateways $1 | get_hostname)"
 #echo $GATEWAY_NAME
 
 ${LINKED:=" "}
 for name in $ENDPOINTS_NAMES; do
-	IFS_NAMES="$(get_endpoint_id $name lab.json | get_ifnames)"
+	IFS_NAMES="$(get_endpoint_id $name $1 | get_ifnames)"
 	ip netns add $name 2> /dev/null
 	if [ $? -eq 0 ]; then
 		echo -e "\n\tNew $name entity setup:"
@@ -111,9 +117,9 @@ for name in $ENDPOINTS_NAMES; do
 	fi
 	echo -e "\t\tCreate, attach, link and configure related network interfaces: "
 	for label in $IFS_NAMES; do
-		ADDR=$(get_endpoint_id $name lab.json | get_address_id $label)
-		MASK=$(get_endpoint_id $name lab.json | get_mask_id $label)
-		PEER=$(get_endpoint_id $name lab.json | get_peer_id $label)
+		ADDR=$(get_endpoint_id $name $1 | get_address_id $label)
+		MASK=$(get_endpoint_id $name $1 | get_mask_id $label)
+		PEER=$(get_endpoint_id $name $1 | get_peer_id $label)
 		#echo "Entity: $name; Label: "$label\_${name,,}"; Addr: $ADDR; Mask: $MASK; Peer: $PEER"
 		PEER="${PEER//[[:space:]]/_}"; PEER=${PEER,,}
 
@@ -132,7 +138,7 @@ for name in $ENDPOINTS_NAMES; do
 	done
 	#here, add default gw and/or routes
 	echo -ne "\t\tConfigure routing tables, ..... "
-	get_endpoint_id $name lab.json | get_routes | \
+	get_endpoint_id $name $1 | get_routes | \
 	while read route; do
 		dst=$(get_route_dst "$route")
 		gw=$(get_route_gw "$route")
@@ -163,7 +169,7 @@ done
 #echo $LINKED
 
 for name in $ROUTERS_NAMES; do
-	IFS_NAMES="$(get_router_id $name lab.json | get_ifnames)"
+	IFS_NAMES="$(get_router_id $name $1 | get_ifnames)"
 	ip netns add $name 2> /dev/null
 	if [ $? -eq 0 ]; then
 		echo -e "\n\tNew $name entity setup:"
@@ -173,9 +179,9 @@ for name in $ROUTERS_NAMES; do
 	fi
 	echo -e "\t\tCreate, attach, link and configure related network interfaces: "
 	for label in $IFS_NAMES; do
-		ADDR=$(get_router_id $name lab.json | get_address_id $label)
-		MASK=$(get_router_id $name lab.json | get_mask_id $label)
-		PEER=$(get_router_id $name lab.json | get_peer_id $label)
+		ADDR=$(get_router_id $name $1 | get_address_id $label)
+		MASK=$(get_router_id $name $1 | get_mask_id $label)
+		PEER=$(get_router_id $name $1 | get_peer_id $label)
 		#echo "Entity: $name; Label: "$label\_${name,,}"; Addr: $ADDR; Mask: $MASK; Peer: $PEER"
 		PEER="${PEER//[[:space:]]/_}"; PEER=${PEER,,}
 
@@ -193,7 +199,7 @@ for name in $ROUTERS_NAMES; do
 	done
 	#here, add default gw and/or routes, forwarding enabled
 	echo -ne "\t\tConfigure routing tables, enable forwarding (default) ..... "
-	get_router_id $name lab.json | get_routes | \
+	get_router_id $name $1 | get_routes | \
 	while read route; do
 		dst=$(get_route_dst "$route")
 		gw=$(get_route_gw "$route")
@@ -226,13 +232,13 @@ for name in $ROUTERS_NAMES; do
 done
 
 for name in $GATEWAY_NAME; do
-	IFS_NAMES="$(get_gateway_id $name lab.json | get_ifnames)"
+	IFS_NAMES="$(get_gateway_id $name $1 | get_ifnames)"
 	echo -e "\n\t$name setup:"
 	echo -e "\t\tCreate, attach, link and configure related network interfaces: "
 	for label in $IFS_NAMES; do
-		ADDR=$(get_gateway_id $name lab.json | get_address_id $label)
-		MASK=$(get_gateway_id $name lab.json | get_mask_id $label)
-		PEER=$(get_gateway_id $name lab.json | get_peer_id $label)
+		ADDR=$(get_gateway_id $name $1 | get_address_id $label)
+		MASK=$(get_gateway_id $name $1 | get_mask_id $label)
+		PEER=$(get_gateway_id $name $1 | get_peer_id $label)
 		#echo "Entity: $name; Label: "$label\_${name,,}"; Addr: $ADDR; Mask: $MASK; Peer: $PEER"
 		PEER="${PEER//[[:space:]]/_}"; PEER=${PEER,,}
 
@@ -250,7 +256,7 @@ for name in $GATEWAY_NAME; do
 
 	echo -ne "\t\tConfigure routing tables ..... "
 	#here, add default gw and/or routes
-	get_gateway_id $name lab.json | get_routes | \
+	get_gateway_id $name $1 | get_routes | \
 	while read route; do
 		dst=$(get_route_dst "$route")
 		gw=$(get_route_gw "$route")
@@ -262,13 +268,14 @@ for name in $GATEWAY_NAME; do
 	done
 	echo "done."    
 
-	IF_INTERNET_NAME="$(get_gateway_id $name lab.json | get_internet_if)"
+	IF_INTERNET_NAME="$(get_gateway_id $name $1 | get_internet_if)"
 	if ! test -z $IF_INTERNET_NAME ; then
 		echo -ne "\t\tEnable forwarding, masquerading for Internet via $IF_INTERNET_NAME ..... "
 		iptables -t nat -A POSTROUTING -o $IF_INTERNET_NAME -j MASQUERADE
-		sysctl net.ipv4.ip_forward=1
+		sysctl net.ipv4.ip_forward=1 > /dev/null
 		echo "done."    
 	fi	
+	echo "done."    
 done
 
 echo -e "\nTerms Usage(see man screen) :\n\to GET IN: sudo screen -r <name>\n\to GET OUT: CTRL-a d\n\to KILL: exit"
