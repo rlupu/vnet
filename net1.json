@@ -41,5 +41,5 @@
 			"route" : {"address" : "10.0.1.0/24", "gw" : "10.0.3.2"},
 			"route" : {"address" : "10.0.2.0/24", "gw" : "10.0.3.2"},
 			"hostname" : "Host", "netifs" : [{"ifname" : "veth0", "address" : "10.0.3.1/24",
-			"peer" : "veth2@Router"}] }
+			"peer" : "veth2@Router"}], "internet" :"eth0" }
 }
