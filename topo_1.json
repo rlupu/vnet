@@ -6,7 +6,7 @@
 				"address" : "10.0.1.1/24" ,
 				"ifname" : "veth0"
 					},
-			"route" : {"address" : "any", "gw" : "10.0.1.2"},
+			"route" : {"address" : "any", "gw" : "10.0.1.2"}, 
 			"route" : {"address" : "any", "gw" : "10.0.1.3"}
 	},
 
@@ -50,5 +50,5 @@
 
 
 
-	"gateway" : { "hostname" : "Host", "netifs" : [{...}, {...}] }
+	"gateway" : { "hostname" : "Gateway", "netifs" : [{...}, {...}] }
 }

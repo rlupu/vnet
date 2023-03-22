@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Copyright (C) 2023 R. Lupu 
+# Copyright (C) 2023 R. Lupu @ UPB 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,14 +18,14 @@
 #
 # Contact:	rlupu@elcom.pub.ro
 #
-# Version:	0.2 (Debian)
+# Version:	0.3 (Debian)
 #
 
 
 while getopts ":hlr" option; do
         case $option in
                 h) #display help
-                   echo "This script provides the management functions for the virtual network for SIRC labs. "
+                   echo "This script provides the management functions for  the  SIRC labs' virtual network. "
 		   echo "It is implemented based on linux namespace technology. Run it w/o any arg to set up "
 		   echo "the required net domains and related IP interconnectivity. 3 terms will be launched "
 		   echo "relying on screen program (see screen documentation). "
@@ -50,17 +50,26 @@ while getopts ":hlr" option; do
 		   fi
 		   exit
 		   ;;
-                r) #remove all namespaces
+                r) #remove whole setup 
 		   if [ $(id -u) -ne 0 ]; then
 			echo "Should have root privileges!"
 			exit
 		   fi
 		   echo -n "Removing all links, net i/f, namespaces and terms ..."
-		   ip netns exec Router ip link del veth0_router
-		   ip netns exec Router ip link del veth1_router
-		   ip netns exec Router ip link del veth2_router
-                   ip netns list | cut -d ' ' -f 1 | xargs -n 1 ip netns del
+		   for name in $(ip netns list | cut -d ' ' -f 1); do
+		   	#ip netns exec $name ip link list type veth | \
+			#	grep -zoiE "^[0-9]+[[:space:]]*:[[:space:]]*[a-z0-9]+@[a-z0-9]+[[:space:]]*" 
+		   	#ip netns exec <Router> ip link del veth0_router	<-- not required.
+		   	ip netns exec $name sysctl net.ipv4.ip_forward=0 2>&1 > /dev/null
+
+                	#remove all namespaces
+                   	ip netns del $name
+		   done
 		   pkill screen
+
+		   #disable Internet access
+		   sysctl net.ipv4.ip_forward=0 2>&1 > /dev/null
+		   iptables -t nat -F POSTROUTING 
                    echo "done."
                    exit
 		   ;;
@@ -73,126 +82,194 @@ if [ $(id -u) -ne 0 ]; then
 	exit
 fi
 
-echo "Create virtual network entities (i.e. namespaces):"
-echo -ne "\tH1\t...... "
-ip netns add H1 2> /dev/null
-if [ $? -eq 0 ]; then
-        echo -e "\tdone"
+if [ -f "./jsonparser.sh" ] ; then
+	source jsonparser.sh
 else
-        echo -e "\texists"
+	echo -e "json parser not found!\nQuit."
+	exit
 fi
 
-echo -ne "\tRouter\t...... "
-ip netns add Router 2> /dev/null
-if [ $? -eq 0 ]; then
-        echo -e "\tdone"
-else
-        echo -e "\texists"
-fi
+echo "Setup and configure the virtual network entities (i.e. namespaces):"
+ENDPOINTS_NAMES="$(get_endpoints lab.json | get_hostname)"
+#echo $ENDPOINTS_NAMES
 
-echo -ne "\tH2\t...... "
-ip netns add H2 2> /dev/null
-if [ $? -eq 0 ]; then
-        echo -e "\tdone"
-else
-        echo -e "\texists"
-fi
+ROUTERS_NAMES="$(get_routers lab.json | get_hostname)"
+#echo $ROUTERS_NAMES
 
+GATEWAY_NAME="$(get_gateways lab.json | get_hostname)"
+#echo $GATEWAY_NAME
 
-echo -n "Create and attach related network interfaces..... "
-ip link add veth0_h1 type veth peer name veth0_router
-ip link add veth0_h2 type veth peer name veth1_router
-ip link add veth0 type veth peer name veth2_router
+${LINKED:=" "}
+for name in $ENDPOINTS_NAMES; do
+	IFS_NAMES="$(get_endpoint_id $name lab.json | get_ifnames)"
+	ip netns add $name 2> /dev/null
+	if [ $? -eq 0 ]; then
+		echo -e "\n\tNew $name entity setup:"
+	else
+		echo -e "\n\t$name..... exists.\n\tQuit."
+		exit
+	fi
+	echo -e "\t\tCreate, attach, link and configure related network interfaces: "
+	for label in $IFS_NAMES; do
+		ADDR=$(get_endpoint_id $name lab.json | get_address_id $label)
+		MASK=$(get_endpoint_id $name lab.json | get_mask_id $label)
+		PEER=$(get_endpoint_id $name lab.json | get_peer_id $label)
+		#echo "Entity: $name; Label: "$label\_${name,,}"; Addr: $ADDR; Mask: $MASK; Peer: $PEER"
+		PEER="${PEER//[[:space:]]/_}"; PEER=${PEER,,}
 
-#attach interfaces accordingly
-ip link set veth0_h1 netns H1 
-ip link set veth0_router netns Router 
+		#create links
+		connected=false; for p in $LINKED; do if [ $p = $PEER ]; then connected=true; fi done
+		if ! $connected ; then
+			ip link add $label\_${name,,} type veth peer name $PEER
+			ip link set $label\_${name,,} netns $name 
+			echo -e "\t\t\t"$label\_${name,,} "attached and linked."
+			LINKED="$LINKED "$label\_${name,,}
+		fi
+		#set the ip/mask!!!
+		ip netns exec $name ip address add $ADDR/$MASK dev $label\_${name,,} 
+		ip netns exec $name ip link set dev $label\_${name,,} up
+		echo -e "\t\t\tInterface: "$label\_${name,,}"..... up"
+	done
+	#here, add default gw and/or routes
+	echo -ne "\t\tConfigure routing tables, ..... "
+	get_endpoint_id $name lab.json | get_routes | \
+	while read route; do
+		dst=$(get_route_dst "$route")
+		gw=$(get_route_gw "$route")
+		if [ $dst = "any" ]; then
+			ip netns exec $name ip route add default via $gw 
+		else
+			ip netns exec $name ip route add $dst via $gw 
+		fi
+	done
+	echo "done."
 
-ip link set veth0_h2 netns H2 
-ip link set veth1_router netns Router 
+	screen -dmS $name-term bash -c "function ip() { /sbin/ip netns exec $name /sbin/ip -c \$* ; } ; \
+		function route() { /sbin/ip netns exec $name /sbin/route \$* ; } ; \
+		function ifconfig() { /sbin/ip netns exec $name /sbin/ifconfig \$* ; } ; \
+		function iptables() { /sbin/ip netns exec $name /sbin/iptables \$* ; } ; \
+		function ping() { /sbin/ip netns exec $name /bin/ping \$* ; } ; \
+		function tcpdump() { /sbin/ip netns exec $name $(which tcpdump) \$* ; } ; \
+		function hping3() { /sbin/ip netns exec $name /usr/sbin/hping3 \$* ; } ; \
+		function scapy3() { /sbin/ip netns exec $name /usr/bin/scapy3 \$* ; } ; \
+		function wget() { /sbin/ip netns exec $name /usr/bin/wget \$* ; } ; \
+		function ssh() { /sbin/ip netns exec $name /usr/bin/ssh \$* ; } ; \
+		export -f ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
+		export PS1=\"$name#\"; \
+		bash --norc"
+	echo -e "\t\t$name-term CLI......up"
 
-ip link set veth2_router netns Router 
-echo "done."    
+done
+#echo $LINKED
 
-echo -n "Configure IP addresses, routing tables, enable forwarding ..... "
-ip netns exec H1 ip address add 10.0.1.1/24 dev veth0_h1
-ip netns exec H1 ip link set dev veth0_h1 up
+for name in $ROUTERS_NAMES; do
+	IFS_NAMES="$(get_router_id $name lab.json | get_ifnames)"
+	ip netns add $name 2> /dev/null
+	if [ $? -eq 0 ]; then
+		echo -e "\n\tNew $name entity setup:"
+	else
+		echo -e "\n\t$name..... exists.\n\tQuit"
+		exit
+	fi
+	echo -e "\t\tCreate, attach, link and configure related network interfaces: "
+	for label in $IFS_NAMES; do
+		ADDR=$(get_router_id $name lab.json | get_address_id $label)
+		MASK=$(get_router_id $name lab.json | get_mask_id $label)
+		PEER=$(get_router_id $name lab.json | get_peer_id $label)
+		#echo "Entity: $name; Label: "$label\_${name,,}"; Addr: $ADDR; Mask: $MASK; Peer: $PEER"
+		PEER="${PEER//[[:space:]]/_}"; PEER=${PEER,,}
 
-ip netns exec H2 ip address add 10.0.2.1/24 dev veth0_h2
-ip netns exec H2 ip link set dev veth0_h2 up
+		#create links
+		connected=false; for p in $LINKED; do if [ $p = $PEER ]; then connected=true; fi done
+		if ! $connected ; then
+			ip link add $label\_${name,,} type veth peer name $PEER
+			LINKED="$LINKED "$label\_${name,,}
+		fi
+		ip link set $label\_${name,,} netns $name 
+		#set the ip/mask!!!
+		ip netns exec $name ip address add $ADDR/$MASK dev $label\_${name,,} 
+		ip netns exec $name ip link set dev $label\_${name,,} up
+		echo -e "\t\t\tInterface: "$label\_${name,,}"..... up"
+	done
+	#here, add default gw and/or routes, forwarding enabled
+	echo -ne "\t\tConfigure routing tables, enable forwarding (default) ..... "
+	get_router_id $name lab.json | get_routes | \
+	while read route; do
+		dst=$(get_route_dst "$route")
+		gw=$(get_route_gw "$route")
+		if [ $dst = "any" ]; then
+			ip netns exec $name ip route add default via $gw 
+		else
+			ip netns exec $name ip route add $dst via $gw 
+		fi
+	done
+	ip netns exec $name sysctl net.ipv4.ip_forward=1 > /dev/null
+	echo "done."
 
-ip netns exec Router ip address add 10.0.1.2/24 dev veth0_router
-ip netns exec Router ip link set dev veth0_router up
-ip netns exec Router ip address add 10.0.2.2/24 dev veth1_router
-ip netns exec Router ip link set dev veth1_router up
-ip netns exec Router ip address add 10.0.3.2/24 dev veth2_router
-ip netns exec Router ip link set dev veth2_router up
+	screen -dmS $name-term bash -c " \
+		function sysctl() { /sbin/ip netns exec $name /sbin/sysctl -c \$* ; } ; \
+		function ip() { /sbin/ip netns exec $name /sbin/ip -c \$* ; } ; \
+		function route() { /sbin/ip netns exec $name /sbin/route \$* ; } ; \
+		function ifconfig() { /sbin/ip netns exec $name /sbin/ifconfig \$* ; } ; \
+		function iptables() { /sbin/ip netns exec $name /sbin/iptables \$* ; } ; \
+		function ping() { /sbin/ip netns exec $name /bin/ping \$* ; } ; \
+		function tcpdump() { /sbin/ip netns exec $name $(which tcpdump) \$* ; } ; \
+		function hping3() { /sbin/ip netns exec $name /usr/sbin/hping3 \$* ; } ; \
+		function scapy3() { /sbin/ip netns exec $name /usr/bin/scapy3 \$* ; } ; \
+		function wget() { /sbin/ip netns exec $name /usr/bin/wget \$* ; } ; \
+		function ssh() { /sbin/ip netns exec $name /usr/bin/ssh \$* ; } ; \
+		export -f sysctl ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
+		export PS1=\"$name#\"; \
+		bash --norc"
+	echo -e "\t\t$name-term CLI......up"
 
-ip address add 10.0.3.1/24 dev veth0
-ip link set dev veth0 up
+done
 
-ip netns exec H1 ip route add default via 10.0.1.2
-ip netns exec H2 ip route add default via 10.0.2.2
-ip netns exec Router ip route add default via 10.0.3.1
+for name in $GATEWAY_NAME; do
+	IFS_NAMES="$(get_gateway_id $name lab.json | get_ifnames)"
+	echo -e "\n\t$name setup:"
+	echo -e "\t\tCreate, attach, link and configure related network interfaces: "
+	for label in $IFS_NAMES; do
+		ADDR=$(get_gateway_id $name lab.json | get_address_id $label)
+		MASK=$(get_gateway_id $name lab.json | get_mask_id $label)
+		PEER=$(get_gateway_id $name lab.json | get_peer_id $label)
+		#echo "Entity: $name; Label: "$label\_${name,,}"; Addr: $ADDR; Mask: $MASK; Peer: $PEER"
+		PEER="${PEER//[[:space:]]/_}"; PEER=${PEER,,}
 
-ip route add 10.0.1.0/24 via 10.0.3.2
-ip route add 10.0.2.0/24 via 10.0.3.2
+		#create links
+		connected=false; for p in $LINKED; do if [ $p = $PEER ]; then connected=true; fi done
+		if ! $connected ; then
+			ip link add $label\_${name,,} type veth peer name $PEER
+			LINKED="$LINKED "$label\_${name,,}
+		fi
+		#set the ip/mask!!!
+		ip address add $ADDR/$MASK dev $label\_${name,,} 
+		ip link set dev $label\_${name,,} up
+		echo -e "\t\t\tInterface: "$label\_${name,,}"..... up"
+	done
 
-ip netns exec Router /bin/bash -c "echo 1 > /proc/sys/net/ipv4/ip_forward"
-echo "1" > /proc/sys/net/ipv4/ip_forward
-echo "done."    
+	echo -ne "\t\tConfigure routing tables ..... "
+	#here, add default gw and/or routes
+	get_gateway_id $name lab.json | get_routes | \
+	while read route; do
+		dst=$(get_route_dst "$route")
+		gw=$(get_route_gw "$route")
+		if [ $dst = "any" ]; then
+			ip route add default via $gw 
+		else
+			ip route add $dst via $gw 
+		fi
+	done
+	echo "done."    
 
-echo -n "Enable masquerading for Internet access via eth0 (default) ..... "
-iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-echo "done."    
+	IF_INTERNET_NAME="$(get_gateway_id $name lab.json | get_internet_if)"
+	if ! test -z $IF_INTERNET_NAME ; then
+		echo -ne "\t\tEnable forwarding, masquerading for Internet via $IF_INTERNET_NAME ..... "
+		iptables -t nat -A POSTROUTING -o $IF_INTERNET_NAME -j MASQUERADE
+		sysctl net.ipv4.ip_forward=1
+		echo "done."    
+	fi	
+done
 
-echo "Launch CLIs for management:"
-screen -dmS H1-term bash -c "function ip() { /sbin/ip netns exec H1 /sbin/ip -c \$* ; } ; \
-	function route() { /sbin/ip netns exec H1 /sbin/route \$* ; } ; \
-	function ifconfig() { /sbin/ip netns exec H1 /sbin/ifconfig \$* ; } ; \
-	function iptables() { /sbin/ip netns exec H1 /sbin/iptables \$* ; } ; \
-	function ping() { /sbin/ip netns exec H1 /bin/ping \$* ; } ; \
-	function tcpdump() { /sbin/ip netns exec H1 /usr/sbin/tcpdump \$* ; } ; \
-	function hping3() { /sbin/ip netns exec H1 /usr/sbin/hping3 \$* ; } ; \
-	function scapy3() { /sbin/ip netns exec H1 /usr/bin/scapy3 \$* ; } ; \
-	function wget() { /sbin/ip netns exec H1 /usr/bin/wget \$* ; } ; \
-	function ssh() { /sbin/ip netns exec H1 /usr/bin/ssh \$* ; } ; \
-	export -f ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
-	export PS1=\"Host 1#\"; \
-	bash --norc"
-echo -e "\tH1-term\t......\tup"
-
-screen -dmS R-term bash -c "function ip() { /sbin/ip netns exec Router /sbin/ip -c \$* ; } ; \
-	function route() { /sbin/ip netns exec Router /sbin/route \$* ; } ; \
-	function ifconfig() { /sbin/ip netns exec Router /sbin/ifconfig \$* ; } ; \
-	function iptables() { /sbin/ip netns exec Router /sbin/iptables \$* ; } ; \
-	function ping() { /sbin/ip netns exec Router /bin/ping \$* ; } ; \
-	function tcpdump() { /sbin/ip netns exec Router /usr/sbin/tcpdump \$* ; } ; \
-	function hping3() { /sbin/ip netns exec Router /usr/sbin/hping3 \$* ; } ; \
-	function scapy3() { /sbin/ip netns exec Router /usr/bin/scapy3 \$* ; } ; \
-	function wget() { /sbin/ip netns exec Router /usr/bin/wget \$* ; } ; \
-	function ssh() { /sbin/ip netns exec Router /usr/bin/ssh \$* ; } ; \
-	export -f ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
-	export PS1=\"Router#\"; \
-	bash --norc"
-echo -e "\tR-term\t......\tup"
-
-screen -dmS H2-term bash -c "function ip() { /sbin/ip netns exec H2 /sbin/ip -c \$* ; } ; \
-	function route() { /sbin/ip netns exec H2 /sbin/route \$* ; } ; \
-	function ifconfig() { /sbin/ip netns exec H2 /sbin/ifconfig \$* ; } ; \
-	function iptables() { /sbin/ip netns exec H2 /sbin/iptables \$* ; } ; \
-	function ping() { /sbin/ip netns exec H2 /bin/ping \$* ; } ; \
-	function tcpdump() { /sbin/ip netns exec H2 /usr/sbin/tcpdump \$* ; } ; \
-	function hping3() { /sbin/ip netns exec H2 /usr/sbin/hping3 \$* ; } ; \
-	function scapy3() { /sbin/ip netns exec H2 /usr/bin/scapy3 \$* ; } ; \
-	function wget() { /sbin/ip netns exec H2 /usr/bin/wget \$* ; } ; \
-	function ssh() { /sbin/ip netns exec H2 /usr/bin/ssh \$* ; } ; \
-	export -f ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
-	export PS1=\"Host 2#\"; \
-	bash --norc"
-echo -e "\tH2-term\t......\tup"
-
-echo "(GO INTO: sudo screen -r <name>; GO OUT: CTRL-a d; CLOSE: exit) "
-echo "done."
-
+echo -e "\nTerms Usage(see man screen) :\n\to GET IN: sudo screen -r <name>\n\to GET OUT: CTRL-a d\n\to KILL: exit"
 

@@ -8,15 +8,14 @@ Run it with no arg to set up the virtual network.  </p>
 
 <p>Three virtual terminals will be launched relying on screen program (see screen documentation), named H1-term,
 H2-term and R-term, respectively. So far, the following commands are supported: ifconfig, route, ip, iptables, 
-ping, tcpdump, scapy3, hping3, wget, ssh.</p>
+ping, tcpdump, scapy3, hping3, wget, ssh (further cmds could be easily added).</p>
 
-<p>Developed and tested with Bash shell on WSL2 Debian platform. </p>
-
+<p>Developed and tested with Bash v5.0.3(1) shell on WSL2 Debian platform. </p>
 
 
 	      .1  (10.0.1.0/24)  .2	      .2  (10.0.2.0/24)  .1
 	| H1 | ------------------ |  Router  | ------------------- | H2 |
-	   veth0_h1     veth0_router	|   veth1_router          veth0_h2
+	   veth0_h1     veth0_router	|   veth1_router       eth0_h2
 					| veth2_router
 					| .2
 					| (10.0.3.0/24)
