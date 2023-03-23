@@ -148,7 +148,9 @@ for name in $ENDPOINTS_NAMES; do
 	done
 	echo "done."
 
-	screen -dmS $name-term bash -c "function ip() { /sbin/ip netns exec $name /sbin/ip -c \$* ; } ; \
+	screen -dmS $name-term bash -c " \
+		function arp() { /sbin/ip netns exec $name /usr/sbin/arp \$* ; } ; \
+		function ip() { /sbin/ip netns exec $name /sbin/ip -c \$* ; } ; \
 		function route() { /sbin/ip netns exec $name /sbin/route \$* ; } ; \
 		function ifconfig() { /sbin/ip netns exec $name /sbin/ifconfig \$* ; } ; \
 		function iptables() { /sbin/ip netns exec $name /sbin/iptables \$* ; } ; \
@@ -212,6 +214,7 @@ for name in $ROUTERS_NAMES; do
 
 	screen -dmS $name-term bash -c " \
 		function sysctl() { /sbin/ip netns exec $name /sbin/sysctl \$* ; } ; \
+		function arp() { /sbin/ip netns exec $name /usr/sbin/arp \$* ; } ; \
 		function ip() { /sbin/ip netns exec $name /sbin/ip -c \$* ; } ; \
 		function route() { /sbin/ip netns exec $name /sbin/route \$* ; } ; \
 		function ifconfig() { /sbin/ip netns exec $name /sbin/ifconfig \$* ; } ; \
@@ -273,8 +276,11 @@ for name in $GATEWAY_NAME; do
 		sysctl net.ipv4.ip_forward=1 > /dev/null
 		echo "done."    
 	fi	
-	echo "done."    
+
+	#enable net namespaces log into the host log files 
+	sysctl net.netfilter.nf_log_all_netns=1 > /dev/null
 done
+echo "done."    
 
 echo -e "\nTerms Usage(see man screen) :\n\to GET IN: sudo screen -r <name>\n\to GET OUT: CTRL-a d\n\to KILL: exit"
 
