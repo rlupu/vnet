@@ -160,7 +160,7 @@ for name in $ENDPOINTS_NAMES; do
 		function scapy3() { /sbin/ip netns exec $name /usr/bin/scapy3 \$* ; } ; \
 		function wget() { /sbin/ip netns exec $name /usr/bin/wget \$* ; } ; \
 		function ssh() { /sbin/ip netns exec $name /usr/bin/ssh \$* ; } ; \
-		export -f ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
+		export -f arp ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
 		export PS1=\"$name#\"; \
 		bash --norc"
 	echo -e "\t\t$name-term CLI......up"
@@ -225,7 +225,7 @@ for name in $ROUTERS_NAMES; do
 		function scapy3() { /sbin/ip netns exec $name /usr/bin/scapy3 \$* ; } ; \
 		function wget() { /sbin/ip netns exec $name /usr/bin/wget \$* ; } ; \
 		function ssh() { /sbin/ip netns exec $name /usr/bin/ssh \$* ; } ; \
-		export -f sysctl ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
+		export -f arp sysctl ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
 		export PS1=\"$name#\"; \
 		bash --norc"
 	echo -e "\t\t$name-term CLI......up"
