@@ -25,11 +25,9 @@
 while getopts ":hlr" option; do
         case $option in
                 h) #display help
-                   echo "This script provides the management functions for  the  SIRC labs' virtual network. "
-		   echo "It is implemented based on linux namespace technology. Run it w/o any arg to set up "
-		   echo "the required net domains and related IP interconnectivity. 3 terms will be launched "
-		   echo "relying on screen program (see screen documentation). "
-		   echo "Usage: vnet.sh [ {-h, -l, -r} ] | <json file>"
+                   echo "This script builds up simple IP virtual networks for related labs activities. "
+		   echo "It is implemented based on linux namespace technology."
+		   echo "Usage: vnet.sh {-h, -l, -r} | <json file>"
 		   echo -e "   -h\tThis help."
 		   echo -e "   -l\tList all user-defined net namespaces."
 		   echo -e "   -r\tRemove all virtual nets and terminals.\n"
@@ -213,7 +211,7 @@ for name in $ROUTERS_NAMES; do
 	echo "done."
 
 	screen -dmS $name-term bash -c " \
-		function sysctl() { /sbin/ip netns exec $name /sbin/sysctl -c \$* ; } ; \
+		function sysctl() { /sbin/ip netns exec $name /sbin/sysctl \$* ; } ; \
 		function ip() { /sbin/ip netns exec $name /sbin/ip -c \$* ; } ; \
 		function route() { /sbin/ip netns exec $name /sbin/route \$* ; } ; \
 		function ifconfig() { /sbin/ip netns exec $name /sbin/ifconfig \$* ; } ; \
