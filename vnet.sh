@@ -60,14 +60,13 @@ while getopts ":hlr" option; do
 		   	#ip netns exec <Router> ip link del veth0_router	<-- not required.
 		   	ip netns exec $name sysctl net.ipv4.ip_forward=0 2>&1 > /dev/null
 
+		   	source ./srvwrappers.sh $name cleanup rsyslog
+
                 	#remove all namespaces
                    	ip netns del $name
 		   done
 		   pkill screen; screen -wipe > /dev/null
 		   sudo pkill rsyslogd
-		   source ./srvwrappers.sh H1 cleanup rsyslog
-		   source ./srvwrappers.sh H2 cleanup rsyslog
-		   source ./srvwrappers.sh Router cleanup rsyslog
 
 		   #disable Internet access
 		   sysctl net.ipv4.ip_forward=0 2>&1 > /dev/null
