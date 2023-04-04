@@ -18,7 +18,7 @@
 #
 # Contact:	rlupu@elcom.pub.ro
 #
-# Version:	0.3 (Debian)
+# Version:	0.4 (Debian)
 #
 
 
@@ -63,7 +63,11 @@ while getopts ":hlr" option; do
                 	#remove all namespaces
                    	ip netns del $name
 		   done
-		   pkill screen
+		   pkill screen; screen -wipe > /dev/null
+		   sudo pkill rsyslogd
+		   source ./srvwrappers.sh H1 cleanup rsyslog
+		   source ./srvwrappers.sh H2 cleanup rsyslog
+		   source ./srvwrappers.sh Router cleanup rsyslog
 
 		   #disable Internet access
 		   sysctl net.ipv4.ip_forward=0 2>&1 > /dev/null
@@ -80,18 +84,18 @@ if [ $(id -u) -ne 0 ]; then
 	exit
 fi
 
-if [ -f "./jsonparser.sh" ] ; then
-	source jsonparser.sh
-else
-	echo -e "json parser not found!\nQuit."
-	exit
-fi
-
 if  ! ( [ $# -ne 0 ] && [ -f "./$1" ] ); then
-	echo -e "json network input file not found or not specified!\nQuit."
+	echo -e "Json network input file not found or not specified!\nQuit."
 	exit
 fi
 
+source ./jsonparser.sh  || { echo -e "Json parser not found!\nQuit."; exit 1; }
+source ./vnetenv.sh || { echo -e "Env not settled.\nQuit."; exit 1; }
+
+function get_nsid() {
+	ppid=$(ps ax|grep -iE SCREEN.*${1:0}|tr -d [:cntrl:]|tr -s [:blank:]|grep -oiE ^[[:space:]]*[0-9]+)
+	ps --ppid $ppid -o pid=|tr -d [:space:]
+}
 
 echo "Setup and configure the virtual network entities (i.e. namespaces):"
 ENDPOINTS_NAMES="$(get_endpoints $1 | get_hostname)"
@@ -108,9 +112,9 @@ for name in $ENDPOINTS_NAMES; do
 	IFS_NAMES="$(get_endpoint_id $name $1 | get_ifnames)"
 	ip netns add $name 2> /dev/null
 	if [ $? -eq 0 ]; then
-		echo -e "\n\tNew $name entity setup:"
+		echo -e "\tNew $name entity setup:"
 	else
-		echo -e "\n\t$name..... exists.\n\tQuit."
+		echo -e "\t$name..... exists.\n\tQuit."
 		exit
 	fi
 	echo -e "\t\tCreate, attach, link and configure related network interfaces: "
@@ -148,21 +152,10 @@ for name in $ENDPOINTS_NAMES; do
 	done
 	echo "done."
 
-	screen -dmS $name-term bash -c " \
-		function arp() { /sbin/ip netns exec $name /usr/sbin/arp \$* ; } ; \
-		function ip() { /sbin/ip netns exec $name /sbin/ip -c \$* ; } ; \
-		function route() { /sbin/ip netns exec $name /sbin/route \$* ; } ; \
-		function ifconfig() { /sbin/ip netns exec $name /sbin/ifconfig \$* ; } ; \
-		function iptables() { /sbin/ip netns exec $name /sbin/iptables \$* ; } ; \
-		function ping() { /sbin/ip netns exec $name /bin/ping \$* ; } ; \
-		function tcpdump() { /sbin/ip netns exec $name $(which tcpdump) \$* ; } ; \
-		function hping3() { /sbin/ip netns exec $name /usr/sbin/hping3 \$* ; } ; \
-		function scapy3() { /sbin/ip netns exec $name /usr/bin/scapy3 \$* ; } ; \
-		function wget() { /sbin/ip netns exec $name /usr/bin/wget \$* ; } ; \
-		function ssh() { /sbin/ip netns exec $name /usr/bin/ssh \$* ; } ; \
-		export -f arp ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
+	screen -dmS $name-term ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
 		export PS1=\"$name#\"; \
-		bash --norc"
+		exec bash --norc"
+	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
 	echo -e "\t\t$name-term CLI......up"
 
 done
@@ -172,9 +165,9 @@ for name in $ROUTERS_NAMES; do
 	IFS_NAMES="$(get_router_id $name $1 | get_ifnames)"
 	ip netns add $name 2> /dev/null
 	if [ $? -eq 0 ]; then
-		echo -e "\n\tNew $name entity setup:"
+		echo -e "\tNew $name entity setup:"
 	else
-		echo -e "\n\t$name..... exists.\n\tQuit"
+		echo -e "\t$name..... exists.\n\tQuit"
 		exit
 	fi
 	echo -e "\t\tCreate, attach, link and configure related network interfaces: "
@@ -212,29 +205,35 @@ for name in $ROUTERS_NAMES; do
 	ip netns exec $name sysctl net.ipv4.ip_forward=1 > /dev/null
 	echo "done."
 
-	screen -dmS $name-term bash -c " \
-		function sysctl() { /sbin/ip netns exec $name /sbin/sysctl \$* ; } ; \
-		function arp() { /sbin/ip netns exec $name /usr/sbin/arp \$* ; } ; \
-		function ip() { /sbin/ip netns exec $name /sbin/ip -c \$* ; } ; \
-		function route() { /sbin/ip netns exec $name /sbin/route \$* ; } ; \
-		function ifconfig() { /sbin/ip netns exec $name /sbin/ifconfig \$* ; } ; \
-		function iptables() { /sbin/ip netns exec $name /sbin/iptables \$* ; } ; \
-		function ping() { /sbin/ip netns exec $name /bin/ping \$* ; } ; \
-		function tcpdump() { /sbin/ip netns exec $name $(which tcpdump) \$* ; } ; \
-		function hping3() { /sbin/ip netns exec $name /usr/sbin/hping3 \$* ; } ; \
-		function scapy3() { /sbin/ip netns exec $name /usr/bin/scapy3 \$* ; } ; \
-		function wget() { /sbin/ip netns exec $name /usr/bin/wget \$* ; } ; \
-		function ssh() { /sbin/ip netns exec $name /usr/bin/ssh \$* ; } ; \
-		export -f arp sysctl ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
+	screen -dmS $name-term ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
 		export PS1=\"$name#\"; \
-		bash --norc"
+		exec bash --norc"
+	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
+
+	#screen -dmS $name-term bash -c " \
+		#function sysctl() { /sbin/ip netns exec $name /sbin/sysctl \$* ; } ; \
+		#function arp() { /sbin/ip netns exec $name /usr/sbin/arp \$* ; } ; \
+		#function ip() { /sbin/ip netns exec $name /sbin/ip -c \$* ; } ; \
+		#function route() { /sbin/ip netns exec $name /sbin/route \$* ; } ; \
+		#function ifconfig() { /sbin/ip netns exec $name /sbin/ifconfig \$* ; } ; \
+		#function iptables() { /sbin/ip netns exec $name /sbin/iptables \$* ; } ; \
+		#function ping() { /sbin/ip netns exec $name /bin/ping \$* ; } ; \
+		#function tcpdump() { /sbin/ip netns exec $name $(which tcpdump) \$* ; } ; \
+		#function hping3() { /sbin/ip netns exec $name /usr/sbin/hping3 \$* ; } ; \
+		#function scapy3() { /sbin/ip netns exec $name /usr/bin/scapy3 \$* ; } ; \
+		#function wget() { /sbin/ip netns exec $name /usr/bin/wget \$* ; } ; \
+		#function ssh() { /sbin/ip netns exec $name /usr/bin/ssh \$* ; } ; \
+		#export -f arp sysctl ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
+		#export PS1=\"$name#\"; \
+		#bash --norc"
+
 	echo -e "\t\t$name-term CLI......up"
 
 done
 
 for name in $GATEWAY_NAME; do
 	IFS_NAMES="$(get_gateway_id $name $1 | get_ifnames)"
-	echo -e "\n\t$name setup:"
+	echo -e "\t$name entity setup:"
 	echo -e "\t\tCreate, attach, link and configure related network interfaces: "
 	for label in $IFS_NAMES; do
 		ADDR=$(get_gateway_id $name $1 | get_address_id $label)
@@ -272,6 +271,7 @@ for name in $GATEWAY_NAME; do
 	IF_INTERNET_NAME="$(get_gateway_id $name $1 | get_internet_if)"
 	if ! test -z $IF_INTERNET_NAME ; then
 		echo -ne "\t\tEnable forwarding, masquerading for Internet via $IF_INTERNET_NAME ..... "
+		#the following doesn't work on Ubuntu, try iptables-legacy or nf_tables instead
 		iptables -t nat -A POSTROUTING -o $IF_INTERNET_NAME -j MASQUERADE
 		sysctl net.ipv4.ip_forward=1 > /dev/null
 		echo "done."    
@@ -280,7 +280,9 @@ for name in $GATEWAY_NAME; do
 	#enable net namespaces log into the host log files 
 	sysctl net.netfilter.nf_log_all_netns=1 > /dev/null
 done
-echo "done."    
+
 
 echo -e "\nTerms Usage(see man screen) :\n\to GET IN: sudo screen -r <name>\n\to GET OUT: CTRL-a d\n\to KILL: exit"
+
+echo "Enjoy."    
 

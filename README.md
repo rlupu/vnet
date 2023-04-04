@@ -30,7 +30,7 @@ Configuration specified in net1.json sample file:
 
 Configuration specified in net2.json sample file:
 
-	      .1  (10.0.1.0/24) .2	 .2  (10.0.2.0/24) .1    .2  (10.0.2.0/24)  .1
+	      .1  (10.0.1.0/24) .2	 .1 (10.0.2.0/24) .2       .1 (10.0.3.0/24) 2.
 
 	| H1 | ------------------ |  R1  | ---------------- |  R2  | ---------------- | H2 |
 
