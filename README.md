@@ -4,9 +4,11 @@
 <p>This script provides simple virtual IPv4 interconnected networks from json predefined topologies given as argument.
 For each network entity a screen-based CLI is setup for management (see screen documentation).
 Internet access could be enabled through masquerading (iptables) via host machine interface.</p>
-<p>Commands tested: arp, sysctl (routers), ifconfig, route, ip, iptables, ping, tcpdump, scapy3, wget, snort.</p>
+<p>Commands tested: arp, sysctl (routers), ifconfig, route, ip, iptables, ping, tcpdump, scapy3, wget, snort, nmap.</p>
 <p>Wrappers implemented for: rsyslog, nmap (more to be added).</p>
 <p>Developed and tested with Bash v5.0.3(1) shell on WSL2 Debian platform. </p>
+<h3>Usage:</h3>
+<p>&nbps;&nbsp;&nbsp;sudo ./vnet.sh <json_file></p>
 
 Configuration specified in net1.json sample file:
 
