@@ -60,13 +60,15 @@ while getopts ":hlr" option; do
 		   	#ip netns exec <Router> ip link del veth0_router	<-- not required.
 		   	ip netns exec $name sysctl net.ipv4.ip_forward=0 2>&1 > /dev/null
 
+			#TODO: ctxt-based removal 
 		   	source ./srvwrappers.sh $name cleanup rsyslog
+		   	source ./srvwrappers.sh $name cleanup nmap 
 
                 	#remove all namespaces
                    	ip netns del $name
 		   done
 		   pkill screen; screen -wipe > /dev/null
-		   sudo pkill rsyslogd
+		   sudo pkill rsyslogd; sudo pkill snort
 
 		   #disable Internet access
 		   sysctl net.ipv4.ip_forward=0 2>&1 > /dev/null
@@ -96,7 +98,7 @@ function get_nsid() {
 	ps --ppid $ppid -o pid=|tr -d [:space:]
 }
 
-echo "Setup and configure the virtual network entities (i.e. namespaces):"
+echo -ne "Setup and configure the virtual network entities (i.e. namespaces) ... "
 ENDPOINTS_NAMES="$(get_endpoints $1 | get_hostname)"
 #echo $ENDPOINTS_NAMES
 
@@ -106,22 +108,24 @@ ROUTERS_NAMES="$(get_routers $1 | get_hostname)"
 GATEWAY_NAME="$(get_gateways $1 | get_hostname)"
 #echo $GATEWAY_NAME
 
+L_ALIGN=${L_ALIGN:="\t"}
 ${LINKED:=" "}
+
 for name in $ENDPOINTS_NAMES; do
 	IFS_NAMES="$(get_endpoint_id $name $1 | get_ifnames)"
 	ip netns add $name 2> /dev/null
 	if [ $? -eq 0 ]; then
-		echo -e "\tNew $name entity setup:"
+		echo -ne "\n${L_ALIGN}New $name entity setup:"
 	else
-		echo -e "\t$name..... exists.\n\tQuit."
+		echo -ne "\n${L_ALIGN}$name..... exists.\n${L_ALIGN}Quit."
 		exit
 	fi
-	echo -e "\t\tCreate, attach, link and configure related network interfaces: "
+	echo -e "\n${L_ALIGN}\tCreate, attach, link and configure related network interfaces: "
 	for label in $IFS_NAMES; do
 		ADDR=$(get_endpoint_id $name $1 | get_address_id $label)
 		MASK=$(get_endpoint_id $name $1 | get_mask_id $label)
 		PEER=$(get_endpoint_id $name $1 | get_peer_id $label)
-		#echo "Entity: $name; Label: "$label\_${name,,}"; Addr: $ADDR; Mask: $MASK; Peer: $PEER"
+		#echo "\n${L_ALIGN}\tEntity: $name; Label: "$label\_${name,,}"; Addr: $ADDR; Mask: $MASK; Peer: $PEER"
 		PEER="${PEER//[[:space:]]/_}"; PEER=${PEER,,}
 
 		#create links
@@ -129,16 +133,16 @@ for name in $ENDPOINTS_NAMES; do
 		if ! $connected ; then
 			ip link add $label\_${name,,} type veth peer name $PEER
 			ip link set $label\_${name,,} netns $name 
-			echo -e "\t\t\t"$label\_${name,,} "attached and linked."
+			echo -ne "${L_ALIGN}\t\t"$label\_${name,,} "attached and linked."
 			LINKED="$LINKED "$label\_${name,,}
 		fi
 		#set the ip/mask!!!
 		ip netns exec $name ip address add $ADDR/$MASK dev $label\_${name,,} 
 		ip netns exec $name ip link set dev $label\_${name,,} up
-		echo -e "\t\t\tInterface: "$label\_${name,,}"..... up"
+		echo -ne "\n${L_ALIGN}\t\tInterface: "$label\_${name,,}"..... up"
 	done
 	#here, add default gw and/or routes
-	echo -ne "\t\tConfigure routing tables, ..... "
+	echo -ne "\n${L_ALIGN}\tConfigure routing tables ..... "
 	get_endpoint_id $name $1 | get_routes | \
 	while read route; do
 		dst=$(get_route_dst "$route")
@@ -149,14 +153,16 @@ for name in $ENDPOINTS_NAMES; do
 			ip netns exec $name ip route add $dst via $gw 
 		fi
 	done
-	echo "done."
+	echo -ne "${DONE_ALIGN:-}done."
 
 	screen -dmS $name-term ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
+		source ./vnetenv.sh; \
 		export PS1=\"$name#\"; \
 		exec bash --norc"
+	#alternatively, put nsenter within bash (above) --> replace get_nsid with $$
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
-	echo -e "\t\t$name-term CLI......up"
-
+	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
+	echo -ne "\n${L_ALIGN}\t$name-term CLI......up"
 done
 #echo $LINKED
 
@@ -164,17 +170,17 @@ for name in $ROUTERS_NAMES; do
 	IFS_NAMES="$(get_router_id $name $1 | get_ifnames)"
 	ip netns add $name 2> /dev/null
 	if [ $? -eq 0 ]; then
-		echo -e "\tNew $name entity setup:"
+		echo -ne "\n${L_ALIGN}New $name entity setup:"
 	else
-		echo -e "\t$name..... exists.\n\tQuit"
+		echo -ne "\n${L_ALIGN}$name..... exists.\n\tQuit"
 		exit
 	fi
-	echo -e "\t\tCreate, attach, link and configure related network interfaces: "
+	echo -ne "\n${L_ALIGN}\tCreate, attach, link and configure related network interfaces: "
 	for label in $IFS_NAMES; do
 		ADDR=$(get_router_id $name $1 | get_address_id $label)
 		MASK=$(get_router_id $name $1 | get_mask_id $label)
 		PEER=$(get_router_id $name $1 | get_peer_id $label)
-		#echo "Entity: $name; Label: "$label\_${name,,}"; Addr: $ADDR; Mask: $MASK; Peer: $PEER"
+		#echo -ne "\n${L_ALIGN}\t\tEntity: $name; Label: "$label\_${name,,}"; Addr: $ADDR; Mask: $MASK; Peer: $PEER"
 		PEER="${PEER//[[:space:]]/_}"; PEER=${PEER,,}
 
 		#create links
@@ -187,10 +193,10 @@ for name in $ROUTERS_NAMES; do
 		#set the ip/mask!!!
 		ip netns exec $name ip address add $ADDR/$MASK dev $label\_${name,,} 
 		ip netns exec $name ip link set dev $label\_${name,,} up
-		echo -e "\t\t\tInterface: "$label\_${name,,}"..... up"
+		echo -ne "\n${L_ALIGN}\t\tInterface: "$label\_${name,,}"..... up"
 	done
 	#here, add default gw and/or routes, forwarding enabled
-	echo -ne "\t\tConfigure routing tables, enable forwarding (default) ..... "
+	echo -ne "\n${L_ALIGN}\tConfigure routing tables, enable forwarding (default) ..... "
 	get_router_id $name $1 | get_routes | \
 	while read route; do
 		dst=$(get_route_dst "$route")
@@ -202,12 +208,14 @@ for name in $ROUTERS_NAMES; do
 		fi
 	done
 	ip netns exec $name sysctl net.ipv4.ip_forward=1 > /dev/null
-	echo "done."
+	echo -ne "${DONE_ALIGN:-}done."
 
 	screen -dmS $name-term ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
+		source ./vnetenv.sh; \
 		export PS1=\"$name#\"; \
 		exec bash --norc"
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
+	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
 
 	#screen -dmS $name-term bash -c " \
 		#function sysctl() { /sbin/ip netns exec $name /sbin/sysctl \$* ; } ; \
@@ -226,19 +234,20 @@ for name in $ROUTERS_NAMES; do
 		#export PS1=\"$name#\"; \
 		#bash --norc"
 
-	echo -e "\t\t$name-term CLI......up"
+	echo -ne "\n${L_ALIGN}\t$name-term CLI......up"
 
 done
 
+unset -v DONE_ALIGN
 for name in $GATEWAY_NAME; do
 	IFS_NAMES="$(get_gateway_id $name $1 | get_ifnames)"
-	echo -e "\t$name entity setup:"
-	echo -e "\t\tCreate, attach, link and configure related network interfaces: "
+	echo -ne "\n${L_ALIGN}$name entity setup:"
+	echo -ne "\n${L_ALIGN}\tCreate, attach, link and configure related network interfaces: "
 	for label in $IFS_NAMES; do
 		ADDR=$(get_gateway_id $name $1 | get_address_id $label)
 		MASK=$(get_gateway_id $name $1 | get_mask_id $label)
 		PEER=$(get_gateway_id $name $1 | get_peer_id $label)
-		#echo "Entity: $name; Label: "$label\_${name,,}"; Addr: $ADDR; Mask: $MASK; Peer: $PEER"
+		#echo -ne "\n${L_ALIGN}\tEntity: $name; Label: "$label\_${name,,}"; Addr: $ADDR; Mask: $MASK; Peer: $PEER"
 		PEER="${PEER//[[:space:]]/_}"; PEER=${PEER,,}
 
 		#create links
@@ -250,10 +259,10 @@ for name in $GATEWAY_NAME; do
 		#set the ip/mask!!!
 		ip address add $ADDR/$MASK dev $label\_${name,,} 
 		ip link set dev $label\_${name,,} up
-		echo -e "\t\t\tInterface: "$label\_${name,,}"..... up"
+		echo -ne "\n${L_ALIGN}\t\tInterface: "$label\_${name,,}"..... up"
 	done
 
-	echo -ne "\t\tConfigure routing tables ..... "
+	echo -ne "\n${L_ALIGN}\tConfigure routing tables ..... "
 	#here, add default gw and/or routes
 	get_gateway_id $name $1 | get_routes | \
 	while read route; do
@@ -265,15 +274,22 @@ for name in $GATEWAY_NAME; do
 			ip route add $dst via $gw 
 		fi
 	done
-	echo "done."    
+	echo -ne "${DONE_ALIGN:-}done."    
 
 	IF_INTERNET_NAME="$(get_gateway_id $name $1 | get_internet_if)"
 	if ! test -z $IF_INTERNET_NAME ; then
-		echo -ne "\t\tEnable forwarding, masquerading for Internet via $IF_INTERNET_NAME ..... "
+		echo -ne "\n${L_ALIGN}\tEnable forwarding, masquerading for Internet via $IF_INTERNET_NAME ..... "
 		#the following doesn't work on Ubuntu, try iptables-legacy or nf_tables instead
-		iptables -t nat -A POSTROUTING -o $IF_INTERNET_NAME -j MASQUERADE
+		if command -v iptables > /dev/null; then
+			iptables -t nat -A POSTROUTING -o $IF_INTERNET_NAME -j MASQUERADE
+		elif command -v iptables-legacy > /dev/null; then
+			iptables-legacy -t nat -A POSTROUTING -o $IF_INTERNET_NAME -j MASQUERADE
+		else
+			echo -ne "\n${L_ALIGN}\t\t${RED}masquerading config. failed.${RST}"	
+			DONE_ALIGN="\n${L_ALIGN}\t"
+		fi
 		sysctl net.ipv4.ip_forward=1 > /dev/null
-		echo "done."    
+		echo -ne "${DONE_ALIGN:-}done."    
 	fi	
 
 	#enable net namespaces log into the host log files 

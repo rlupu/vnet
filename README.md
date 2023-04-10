@@ -1,12 +1,11 @@
 # vnet
 <p>IP Virtual Network relying on net namespace technolgy for labs activities. </p>
 
-<p>This script provides simple virtual IPv4 networks from json predefined topologies given as argument.
+<p>This script provides simple virtual IPv4 interconnected networks from json predefined topologies given as argument.
 For each network entity a screen-based CLI is setup for management (see screen documentation).
 Internet access could be enabled through masquerading (iptables) via host machine interface.</p>
-<p>So far, the following commands are supported: arp, sysctl (routers), ifconfig, route, ip, iptables, 
-ping, tcpdump, scapy3, hping3, wget, ssh (further cmds could be easily added).</p>
-
+<p>Commands tested: arp, sysctl (routers), ifconfig, route, ip, iptables, ping, tcpdump, scapy3, wget, snort.</p>
+<p>Wrappers implemented for: rsyslog, nmap (more to be added).</p>
 <p>Developed and tested with Bash v5.0.3(1) shell on WSL2 Debian platform. </p>
 
 Configuration specified in net1.json sample file:

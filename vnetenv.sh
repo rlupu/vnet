@@ -24,6 +24,7 @@ VPATH="/tmp/vnet"
 VTERM="screen" 		#or "xterm"
 
 RED='\e[0;31m'
+GREEN='\e[0;32m'
 YELLOW='\e[0;33m'
 RST='\e[0m'
 
@@ -36,8 +37,11 @@ function vterm ( ) {
 	fi
 }
 
-export -f vterm
+function ip() { 
+	/sbin/ip -c $*  
+} 
+
+export -f vterm ip
 
 export PS1='Host $'
-#export PS1='${USER}@${HOSTNAME}$'
 
