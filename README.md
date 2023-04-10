@@ -8,7 +8,7 @@ Internet access could be enabled through masquerading (iptables) via host machin
 <p>Wrappers implemented for: rsyslog, nmap (more to be added).</p>
 <p>Developed and tested with Bash v5.0.3(1) shell on WSL2 Debian platform. </p>
 <h3>Usage:</h3>
-<p>&nbps;&nbsp;&nbsp;sudo ./vnet.sh <json_file></p>
+<p>&nbsp;&nbsp;&nbsp;sudo ./vnet.sh <json_file></p>
 
 Configuration specified in net1.json sample file:
 
