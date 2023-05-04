@@ -1,12 +1,11 @@
 # vnet
-<p>IP Virtual Network relying on net and mount namespace technolgy for labs activities. </p>
+<p>IP Virtual Network relying on net &plus; mount namespace technolgy for labs activities. </p>
 
 <p>This script provides simple virtual IPv4 interconnected networks from json predefined topologies given as argument.
 For each network entity a screen-based CLI is setup for management (see screen documentation).
 Internet access could be enabled through masquerading (iptables) via host machine interface.</p>
 
-<p>Commands tested: arp, sysctl (routers), ifconfig, route, ip, iptables, ping, tcpdump, scapy3, wget, snort, nmap,
-ipsec</p>
+<p>Commands tested: arp, sysctl (routers), ifconfig, route, ip, iptables, ping, tcpdump, scapy3, wget, snort, nmap, ipsec</p>
 
 <p>Wrappers implemented for: </p>
 <ul>
@@ -21,7 +20,8 @@ ipsec</p>
 <h3>Usage:</h3>
 <p>&nbsp;&nbsp;&nbsp;sudo ./vnet.sh &lt;json_file&gt;</p>
 
-<p>Configuration specified in net1.json sample file:</p>
+Configuration specified in net1.json sample file:</br>
+
 	      .1  (10.0.1.0/24)  .2	      .2  (10.0.2.0/24)  .1
 	| H1 | ------------------ |  Router  | ------------------- | H2 |
 	   veth0_h1     veth0_router	|   veth1_router      veth0_h2
@@ -38,8 +38,8 @@ ipsec</p>
 				    Internet
 
 
+Configuration specified in net2.json sample file:</br>
 
-<p>Configuration specified in net2.json sample file:</p>
 	      .1  (10.0.1.0/24) .2	 .1 (10.0.2.0/24) .2       .1 (10.0.3.0/24) 2.
 	| H1 | ------------------ |  R1  | ---------------- |  R2  | ---------------- | H2 |
 
