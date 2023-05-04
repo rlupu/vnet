@@ -1,5 +1,5 @@
 # vnet
-<p>IP Virtual Network relying on net+mount namespace technolgy for labs activities. </p>
+<p>IP Virtual Network relying on net and mount namespace technolgy for labs activities. </p>
 
 <p>This script provides simple virtual IPv4 interconnected networks from json predefined topologies given as argument.
 For each network entity a screen-based CLI is setup for management (see screen documentation).
@@ -41,7 +41,6 @@ ipsec</p>
 
 <p>Configuration specified in net2.json sample file:</p>
 	      .1  (10.0.1.0/24) .2	 .1 (10.0.2.0/24) .2       .1 (10.0.3.0/24) 2.
-
 	| H1 | ------------------ |  R1  | ---------------- |  R2  | ---------------- | H2 |
 
 	   veth0_h1    	    veth0_r1	veth1_r1      veth0_r2    veth1_r2	   veth0_h2
