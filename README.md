@@ -21,7 +21,7 @@ ipsec</p>
 <h3>Usage:</h3>
 <p>&nbsp;&nbsp;&nbsp;sudo ./vnet.sh &lt;json_file&gt;</p>
 
-<p>Configuration specified in net1.json sample file:</a>
+<p>Configuration specified in net1.json sample file:</p>
 	      .1  (10.0.1.0/24)  .2	      .2  (10.0.2.0/24)  .1
 	| H1 | ------------------ |  Router  | ------------------- | H2 |
 	   veth0_h1     veth0_router	|   veth1_router      veth0_h2
@@ -39,7 +39,7 @@ ipsec</p>
 
 
 
-<a>Configuration specified in net2.json sample file:</a>
+<p>Configuration specified in net2.json sample file:</p>
 	      .1  (10.0.1.0/24) .2	 .1 (10.0.2.0/24) .2       .1 (10.0.3.0/24) 2.
 
 	| H1 | ------------------ |  R1  | ---------------- |  R2  | ---------------- | H2 |
