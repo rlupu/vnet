@@ -18,9 +18,16 @@
 #
 # Contact:	rlupu@elcom.pub.ro
 #
-# Version:	0.4 (Debian)
+# Version:	0.5 (Debian)
 #
 
+source ./vnetenv.sh || { echo -e "Env not settled.\nQuit."; exit 1; }
+source ./jsonparser.sh  || { echo -e "Json parser not found!\nQuit."; exit 1; }
+
+function get_nsid() {
+	ppid=$(ps ax|grep -iE SCREEN.*${1:0}|tr -d [:cntrl:]|tr -s [:blank:]|grep -oiE ^[[:space:]]*[0-9]+)
+	ps --ppid $ppid -o pid=|tr -d [:space:]
+}
 
 while getopts ":hlr" option; do
         case $option in
@@ -68,7 +75,8 @@ while getopts ":hlr" option; do
                    	ip netns del $name
 		   done
 		   pkill screen; screen -wipe > /dev/null
-		   sudo pkill rsyslogd; sudo pkill snort
+		   pkill rsyslogd; pkill snort; pkill charon; pkill starter
+		   ip xfrm state flush && ip xfrm policy flush 
 
 		   #disable Internet access
 		   sysctl net.ipv4.ip_forward=0 2>&1 > /dev/null
@@ -90,13 +98,10 @@ if  ! ( [ $# -ne 0 ] && [ -f "./$1" ] ); then
 	exit
 fi
 
-source ./jsonparser.sh  || { echo -e "Json parser not found!\nQuit."; exit 1; }
-source ./vnetenv.sh || { echo -e "Env not settled.\nQuit."; exit 1; }
-
-function get_nsid() {
-	ppid=$(ps ax|grep -iE SCREEN.*${1:0}|tr -d [:cntrl:]|tr -s [:blank:]|grep -oiE ^[[:space:]]*[0-9]+)
-	ps --ppid $ppid -o pid=|tr -d [:space:]
-}
+if ! test -d $VPATH ; then
+	echo  "folder $VPATH is created."
+	mkdir $VPATH
+fi
 
 echo -ne "Setup and configure the virtual network entities (i.e. namespaces) ... "
 ENDPOINTS_NAMES="$(get_endpoints $1 | get_hostname)"
@@ -117,7 +122,7 @@ for name in $ENDPOINTS_NAMES; do
 	if [ $? -eq 0 ]; then
 		echo -ne "\n${L_ALIGN}New $name entity setup:"
 	else
-		echo -ne "\n${L_ALIGN}$name..... exists.\n${L_ALIGN}Quit."
+		echo -ne "\n${L_ALIGN}$name..... exists.\n${L_ALIGN}Quit.\n"
 		exit
 	fi
 	echo -e "\n${L_ALIGN}\tCreate, attach, link and configure related network interfaces: "
@@ -161,7 +166,8 @@ for name in $ENDPOINTS_NAMES; do
 		exec bash --norc"
 	#alternatively, put nsenter within bash (above) --> replace get_nsid with $$
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
-	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
+	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
+	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup strongswan"
 	echo -ne "\n${L_ALIGN}\t$name-term CLI......up"
 done
 #echo $LINKED
@@ -172,7 +178,7 @@ for name in $ROUTERS_NAMES; do
 	if [ $? -eq 0 ]; then
 		echo -ne "\n${L_ALIGN}New $name entity setup:"
 	else
-		echo -ne "\n${L_ALIGN}$name..... exists.\n\tQuit"
+		echo -ne "\n${L_ALIGN}$name..... exists.\n\tQuit.\n"
 		exit
 	fi
 	echo -ne "\n${L_ALIGN}\tCreate, attach, link and configure related network interfaces: "
@@ -215,7 +221,8 @@ for name in $ROUTERS_NAMES; do
 		export PS1=\"$name#\"; \
 		exec bash --norc"
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
-	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
+	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
+	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup strongswan"
 
 	#screen -dmS $name-term bash -c " \
 		#function sysctl() { /sbin/ip netns exec $name /sbin/sysctl \$* ; } ; \
