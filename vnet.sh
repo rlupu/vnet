@@ -98,7 +98,8 @@ if [[ ${VTERM,,} == *screen* ]]; then
 	fi
 
 elif [[ ${VTERM,,} == *xterm* ]]; then
-	echo "VTERM is set to xterm"
+	echo -e "VTERM is set to xterm.\nNot supported yet."
+	exit 1
 else
 	echo "VTERM is unset/unknown, falling back to VTERM=screen"
 	VTERM="screen"
