@@ -99,7 +99,7 @@ if [[ ${VTERM,,} == *screen* ]]; then
 
 elif [[ ${VTERM,,} == *xterm* ]]; then
 	echo -e "VTERM is set to xterm.\nNot supported yet."
-	exit 21
+	exit 1
 else
 	echo "VTERM is unset/unknown, falling back to VTERM=screen"
 	VTERM="screen"
@@ -233,10 +233,15 @@ for name in $ROUTERS_NAMES; do
 	ip netns exec $name sysctl net.ipv4.ip_forward=1 > /dev/null
 	echo -ne "${DONE_ALIGN:-}done."
 
-	screen -dmS $name-term ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
-		source ./vnetenv.sh; \
-		export PS1=\"$name#\"; \
-		exec bash --norc"
+	if [[ ${VTERM,,} == *screen* ]]; then
+		screen -dmS $name-term ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
+			source ./vnetenv.sh; \
+			export PS1=\"$name#\"; \
+			exec bash --norc"
+	else
+		echo -e "VTERM must have value screen.\nQuit."
+		exit 1
+	fi
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup strongswan"
