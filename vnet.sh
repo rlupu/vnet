@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Copyright (C) 2023 R. Lupu @ UPB 
+# Copyright (C) 2023, 2024 R. Lupu @ UNSTPB 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,12 +16,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Contact:	rlupu@elcom.pub.ro
+# Contact:	rlupu at elcom.pub.ro
 #
-# Version:	0.5 (Debian)
+# Version:	0.6 (Debian)
 #
 
-source ./vnetenv.sh || { echo -e "Env not settled.\nQuit."; exit 1; }
+
+#looking up for required internal modules 
+source ./vnetenv.sh || { echo -e "Warning: vnet environment manager missing."; }
 source ./jsonparser.sh  || { echo -e "Json parser not found!\nQuit."; exit 1; }
 
 function get_nsid() {
@@ -55,7 +57,7 @@ while getopts ":hlr" option; do
 		   fi
 		   exit
 		   ;;
-                r) #remove whole setup 
+                r) #remove the entire setup 
 		   if [ $(id -u) -ne 0 ]; then
 			echo "Should have root privileges!"
 			exit
@@ -87,15 +89,29 @@ while getopts ":hlr" option; do
         esac
 done
 
+#check out for dependencies
+if [[ ${VTERM,,} == *screen* ]]; then
+	echo "VTERM is set to screen."
+	if ! command -v screen > /dev/null; then
+		echo -e "screen\t - the terminals emulator not found.\nQuit."
+		exit 1
+	fi
+
+elif [[ ${VTERM,,} == *xterm* ]]; then
+	echo "VTERM is set to xterm"
+else
+	echo "VTERM is unset/unknown, falling back to VTERM=screen"
+	VTERM="screen"
+fi
 
 if [ $(id -u) -ne 0 ]; then
 	echo "Should have root privileges!"
-	exit
+	exit 1
 fi
 
 if  ! ( [ $# -ne 0 ] && [ -f "./$1" ] ); then
 	echo -e "Json network input file not found or not specified!\nQuit."
-	exit
+	exit 1
 fi
 
 if ! test -d $VPATH ; then
@@ -167,7 +183,7 @@ for name in $ENDPOINTS_NAMES; do
 	#alternatively, put nsenter within bash (above) --> replace get_nsid with $$
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
-	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup strongswan"
+	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup strongswan"
 	echo -ne "\n${L_ALIGN}\t$name-term CLI......up"
 done
 #echo $LINKED
@@ -222,7 +238,7 @@ for name in $ROUTERS_NAMES; do
 		exec bash --norc"
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
-	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup strongswan"
+	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup strongswan"
 
 	#screen -dmS $name-term bash -c " \
 		#function sysctl() { /sbin/ip netns exec $name /sbin/sysctl \$* ; } ; \
@@ -304,7 +320,9 @@ for name in $GATEWAY_NAME; do
 done
 
 
-echo -e "\nTerms Usage(see man screen) :\n\to GET IN: sudo screen -r <name>\n\to GET OUT: CTRL-a d\n\to KILL: exit"
+if [[ ${VTERM,,} == *screen* ]]; then
+	echo -e "\nTerms Usage(see man screen) :\n\to GET IN: sudo screen -r <name>\n\to GET OUT: CTRL-a d\n\to KILL: exit"
+fi
 
 echo "Enjoy."    
 

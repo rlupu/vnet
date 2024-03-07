@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Copyright (C) 2023 R. Lupu @ UPB 
+# Copyright (C) 2023, 2024 R. Lupu @ UNSTPB 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Contact:	rlupu@elcom.pub.ro
+# Contact:	rlupu at elcom.pub.ro
 #
 # Version:	0.3 (Debian)
 #
