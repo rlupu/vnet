@@ -108,10 +108,14 @@ if [[ ${VTERM,,} == *screen* ]]; then
 	fi
 
 elif [[ ${VTERM,,} == *xterm* ]]; then
-	echo -e "VTERM is set to xterm.\nNot supported yet."
+	echo -e "VTERM=xterm not supported yet.\nQuit."
 	exit 1
 else
-	echo "${YELLOW}VTERM value is unknown, falling back to default VTERM=screen${RST}"
+	echo -e "${YELLOW}VTERM value is unknown, falling back to default VTERM=screen${RST}"
+	if ! command -v screen > /dev/null; then
+		echo -e "screen\t - the terminals emulator not found.\nQuit."
+		exit 1
+	fi
 	VTERM="screen"
 fi
 
