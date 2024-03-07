@@ -22,9 +22,13 @@
 #
 
 
-#looking up for required internal modules 
+#include required internal modules 
 source ./vnetenv.sh || { echo -e "Warning: vnet environment manager missing."; }
-source ./jsonparser.sh  || { echo -e "Json parser not found!\nQuit."; exit 1; }
+source ./jsonparser.sh  || { echo -e "json parser not found!\nQuit."; exit 1; }
+
+#mandatory variables default values
+VPATH=${VPATH:-"/tmp/vnet"}
+VTERM=${VTERM:-"screen"}
 
 function get_nsid() {
 	ppid=$(ps ax|grep -iE SCREEN.*${1:0}|tr -d [:cntrl:]|tr -s [:blank:]|grep -oiE ^[[:space:]]*[0-9]+)
@@ -89,6 +93,12 @@ while getopts ":hlr" option; do
         esac
 done
 
+
+if [ $(id -u) -ne 0 ]; then
+	echo "Should have root privileges!"
+	exit 1
+fi
+
 #check out for dependencies
 if [[ ${VTERM,,} == *screen* ]]; then
 	echo "VTERM is set to screen."
@@ -101,17 +111,12 @@ elif [[ ${VTERM,,} == *xterm* ]]; then
 	echo -e "VTERM is set to xterm.\nNot supported yet."
 	exit 1
 else
-	echo "VTERM is unset/unknown, falling back to VTERM=screen"
+	echo "${YELLOW}VTERM value is unknown, falling back to default VTERM=screen${RST}"
 	VTERM="screen"
 fi
 
-if [ $(id -u) -ne 0 ]; then
-	echo "Should have root privileges!"
-	exit 1
-fi
-
 if  ! ( [ $# -ne 0 ] && [ -f "./$1" ] ); then
-	echo -e "Json network input file not found or not specified!\nQuit."
+	echo -e "json network topology file not found/specified!\nQuit."
 	exit 1
 fi
 
@@ -238,9 +243,8 @@ for name in $ROUTERS_NAMES; do
 			source ./vnetenv.sh; \
 			export PS1=\"$name#\"; \
 			exec bash --norc"
-	else
-		echo -e "VTERM must have value screen.\nQuit."
-		exit 1
+	elif [[ ${VTERM,,} == *xterm* ]]; then
+		echo -e "${RED}VTERM=xterm not supported, yet.\nQuit.${RST}"
 	fi
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"

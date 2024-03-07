@@ -21,7 +21,7 @@
 #
 
 VPATH="/tmp/vnet"
-VTERM="screen" 		
+#VTERM="screen" 		
 #VTERM="xterm"
 VHOME="$VPATH/home"
 
