@@ -86,12 +86,15 @@ function rsyslog_setup () {
 		if ! test -f /dev/urandom ; then
 			umount /dev/
 			cp -nrf /dev/urandom $VPATH/$1/dev/
+			cp -nrf /dev/null $VPATH/$1/dev/
+			#mknod /dev/null c 1 3
 			mount --bind --make-private $VPATH/$1/dev/ /dev/
 		fi
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
 	else
 		if ! test -f /dev/urandom ; then
 			cp -nrf /dev/urandom $VPATH/$1/dev/
+			cp -nrf /dev/null $VPATH/$1/dev/
 		fi
 		mount --bind --make-private $VPATH/$1/dev/ /dev/	#alternatively, set Socket with
 									#imuxsock module within rsyslog.conf
@@ -124,12 +127,14 @@ function nmap_setup () {
 		if ! test -f /dev/random ; then
 			umount /dev/
 			cp -nrf /dev/random $VPATH/$1/dev/
+			cp -nrf /dev/null $VPATH/$1/dev/
 			mount --bind --make-private $VPATH/$1/dev/ /dev/
 		fi
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
 	else	
 		if ! test -f $VPATH/$1/dev/random ; then
 			cp -nrf /dev/random $VPATH/$1/dev/		#just in case will be mounted
+			cp -nrf /dev/null $VPATH/$1/dev/
 		fi							#by another wrapper
 	fi
 	echo -ne "${DONE_ALIGN:-}done."
@@ -155,7 +160,7 @@ function strongswan_setup () {
 		exit
 	fi
 
-	#first, clone the folders shared + raced with the others wrappers
+	#first, clone the shared folders + raced with the others wrappers
 	if ! test -d $VPATH/$1/ ; then
 		echo -ne "\n${L_ALIGN}\tfolder $VPATH/$1/ is created."
 		mkdir $VPATH/$1
