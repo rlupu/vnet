@@ -182,10 +182,15 @@ for name in $ENDPOINTS_NAMES; do
 	done
 	echo -ne "${DONE_ALIGN:-}done."
 
-	screen -dmS $name-term ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
-		source ./vnetenv.sh; \
-		export PS1=\"$name#\"; \
-		exec bash --norc"
+	if [[ ${VTERM,,} == *screen* ]]; then
+		screen -dmS $name-term ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
+			source ./vnetenv.sh; \
+			export PS1=\"$name#\"; \
+			exec bash --norc"
+	elif [[ ${VTERM,,} == *xterm* ]]; then
+		echo -e "${RED}VTERM=xterm not supported, yet.\nQuit.${RST}"
+	fi
+
 	#alternatively, put nsenter within bash (above) --> replace get_nsid with $$
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
