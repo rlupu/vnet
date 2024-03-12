@@ -18,7 +18,7 @@
 #
 # Contact:	rlupu at elcom.pub.ro
 #
-# Version:	0.6 (Debian)
+# Version:	0.63 (Debian)
 #
 
 
@@ -31,9 +31,15 @@ VPATH=${VPATH:-"/tmp/vnet"}
 VTERM=${VTERM:-"screen"}
 
 function get_nsid() {
-	#ppid=$(ps ax|grep -iE SCREEN.*${1}|tr -d [:cntrl:]|tr -s [:blank:]|grep -oiE ^[[:space:]]*[0-9]+)
-	ppid=$(ps ax -o pid,cmd|grep -iE $VTERM.*${1}|grep -v grep|cut -d ' ' -f1|tr -d [:space:])
-	ps --ppid $ppid -o pid=
+	ppid=$(ps ax -o pid,cmd|grep -iE $VTERM.*${1}|grep -v grep|grep -oiE ^[[:space:]]*[0-9]+|tr -d [:space:])
+	while : ; do
+		nsid=$(ps --ppid $ppid -o pid=)
+		if ! [[ -z "$nsid" ]]; then 
+			break
+		fi
+		sleep 1
+	done
+	echo $nsid
 }
 
 while getopts ":hlr" option; do
@@ -82,7 +88,7 @@ while getopts ":hlr" option; do
                    	ip netns del $name
 		   done
 		   pkill screen; screen -wipe > /dev/null
-		   pkill xterm; 
+		   pkill xterm > /dev/null 
 		   pkill rsyslogd; pkill snort; pkill charon; pkill starter
 		   ip xfrm state flush && ip xfrm policy flush 
 
@@ -103,14 +109,16 @@ fi
 
 #check out for dependencies
 if [[ ${VTERM,,} == *screen* ]]; then
-	echo "VTERM is set to screen."
 	if ! command -v screen > /dev/null; then
 		echo -e "screen\t - the terminals emulator not found.\nQuit."
 		exit 1
 	fi
 
 elif [[ ${VTERM,,} == *xterm* ]]; then
-	echo -e "VTERM=xterm not fully supported yet."
+	if ! command -v xterm > /dev/null; then
+		echo -e "xterm\t - the X terminal emulator not found.\nQuit."
+		exit 1
+	fi
 else
 	echo -e "${YELLOW}VTERM value is unknown, falling back to default VTERM=screen${RST}"
 	if ! command -v screen > /dev/null; then
@@ -193,13 +201,12 @@ for name in $ENDPOINTS_NAMES; do
 			export PS1=\"$name#\"; \
 			exec bash --norc"
 	elif [[ ${VTERM,,} == *xterm* ]]; then
-		#xterm -title $name -e 'echo -e "Welcome to host!";source ./vnetenv.sh;export PS1="host#"; exec bash --rcfile /etc/bash.bashrc' &
-		xterm -title $name -e "exec ip netns exec $name bash -norc" &
-		sleep 1 
+		#xterm -title $name -e 'echo -e "echo 'Welcome to host!'; \
+		#	source ./vnetenv.sh;export PS1="host#"; exec bash --rcfile /etc/bash.bashrc' &
+		xterm -title $name -bg black -fg white -e ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
+			export PS1='$name#'; exec bash -norc" &
 	fi
 
-	#echo -n "NSID:"
-	#echo $(get_nsid ${name})
 	#alternatively, put nsenter within bash (above) --> replace get_nsid with $$
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
@@ -258,9 +265,10 @@ for name in $ROUTERS_NAMES; do
 			export PS1=\"$name#\"; \
 			exec bash --norc"
 	elif [[ ${VTERM,,} == *xterm* ]]; then
-		xterm -title $name -e "exec ip netns exec $name bash -norc" &
-		sleep 1 
+		xterm -title $name -e ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
+			export PS1='$name#'; exec bash -norc" &
 	fi
+
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup strongswan"
@@ -346,8 +354,11 @@ done
 
 
 if [[ ${VTERM,,} == *screen* ]]; then
-	echo -ne "\nTerms Usage(see man screen) :\n\to GET IN: sudo screen -r <name>\n\to GET OUT: CTRL-a d\n\to KILL: exit"
+	echo -e "\n\nVNET UI is screen(VTERM=\"screen\")."
+	echo -e "Terms Usage(see man screen) :\n\to GET IN: sudo screen -r <name>\n\to GET OUT: CTRL-a d\n\to KILL: exit"
+else
+	echo -e "\n\nVNET UI is xterm(VTERM=\"xterm\")."
 fi
 
-echo -e "\nEnjoy."    
+echo -e "Enjoy."    
 
