@@ -5,12 +5,13 @@
 For each network entity a screen-based CLI is setup for management (see screen documentation).
 Internet access could be enabled through masquerading (iptables) via host machine interface.</p>
 
-<p>Commands tested: arp, sysctl (routers), ifconfig, route, ip, iptables, ping, tcpdump, scapy3, wget, snort, nmap, ipsec</p>
+<p>Commands tested: arp, sysctl (routers), ifconfig, route, ip, iptables, ping, tcpdump, scapy3, wget, snort, nmap, ipsec, ssh</p>
 
 <p>Wrappers implemented for: </p>
 <ul>
 <li>rsyslog</li>
 <li>nmap</li>
+<li>ssh(to date, single daemon instance tested)</li>
 <li>strongswan</li>
 <li>(more to be added)</li>
 </ul>
@@ -19,6 +20,10 @@ Internet access could be enabled through masquerading (iptables) via host machin
 
 <h3>Usage:</h3>
 <p>&nbsp;&nbsp;&nbsp;sudo ./vnet.sh &lt;json_file&gt;</p>
+
+<h3>Vnet UI configuration</h3>
+<p>In file vnetenv.sh set variable VTERM={"screen", "xterm"} for screen-style interraction or xterm-style, respectivelly.</p>
+
 
 Configuration specified in net1.json sample file:</br>
 

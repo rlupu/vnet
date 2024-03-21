@@ -203,13 +203,17 @@ for name in $ENDPOINTS_NAMES; do
 	elif [[ ${VTERM,,} == *xterm* ]]; then
 		#xterm -title $name -e 'echo -e "echo 'Welcome to host!'; \
 		#	source ./vnetenv.sh;export PS1="host#"; exec bash --rcfile /etc/bash.bashrc' &
-		xterm -title $name -bg black -fg white -e ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
-			export PS1='$name#'; exec bash -norc" &
+		xterm -title $name -bg black -fg white -sl 100 -sb -rightbar -fa Monospace -fs 10 -e 	\
+			ip netns exec $name /bin/bash -c 						\
+			"echo 'Welcome to $name!'; 							\
+			export PS1='$name#';exec bash --norc" &
+		#xterm -title $name -e ip netns exec $name /bin/bash -c "exec bash" &
 	fi
 
 	#alternatively, put nsenter within bash (above) --> replace get_nsid with $$
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
+	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup ssh"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup strongswan"
 	echo -ne "\n${L_ALIGN}\t$name-term CLI......up"
 done
@@ -265,12 +269,16 @@ for name in $ROUTERS_NAMES; do
 			export PS1=\"$name#\"; \
 			exec bash --norc"
 	elif [[ ${VTERM,,} == *xterm* ]]; then
-		xterm -title $name -e ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
-			export PS1='$name#'; exec bash -norc" &
+		xterm -title $name -sl 100 -sb -rightbar -fa default -fs 10 -e 	\
+			ip netns exec $name /bin/bash -c 			\
+			"echo 'Welcome to $name!'; 				\
+			export PS1='$name#';exec bash --norc" &
+		#xterm -title $name -e ip netns exec $name /bin/bash -c "exec bash" &
 	fi
 
 	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
+	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup ssh"
 	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup strongswan"
 
 	#screen -dmS $name-term bash -c " \

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2023 R. Lupu @ UPB 
+# Copyright (C) 2023, 2024 R. Lupu @ UPB, UNSTPB 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,9 +15,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Contact:	rlupu@elcom.pub.ro
+# Contact:	rlupu at elcom.pub.ro
 #
-# Version:	0.6 (Debian)
+# Version:	0.7 (Debian)
 #
 # Usage: 	<$0> <namespace> {setup, cleanup} <service> 
 #
@@ -67,33 +67,33 @@ function rsyslog_setup () {
 	fi
 
 	#second, populate with req. files + mount folders
-	if findmnt /var/log/|grep $VPATH > /dev/null; then
+	if findmnt -rno SOURCE /var/log/|grep $VPATH > /dev/null; then
 		echo -ne "\n${L_ALIGN}\t${YELLOW}Warning:${RST} /var/log/ already mounted."
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
 	else
 		mount --bind --make-private $VPATH/$1/var/log/ /var/log/
 	fi
 
-	if findmnt /var/run/|grep $VPATH > /dev/null; then		#TODO: work directly on /run
+	if findmnt -rno SOURCE /var/run/|grep $VPATH > /dev/null; then		#TODO: work directly on /run
 		echo -ne "\n${L_ALIGN}\t\e[33mWarning:${RST} /var/run/ already mounted."
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
 	else
 		mount --bind --make-private $VPATH/$1/var/run /var/run/
 	fi
 
-	if findmnt /dev/|grep $VPATH > /dev/null; then
+	if findmnt -nro SOURCE /dev/|grep $VPATH > /dev/null; then
 		echo -ne "\n${L_ALIGN}\t${YELLOW}Warning:${RST} /dev/ already mounted."
 		if ! test -f /dev/urandom ; then
 			umount /dev/
 			cp -nrf /dev/urandom $VPATH/$1/dev/
-			cp -nrf /dev/null $VPATH/$1/dev/
+			cp -nr /dev/null $VPATH/$1/dev/
 			#mknod /dev/null c 1 3
 			mount --bind --make-private $VPATH/$1/dev/ /dev/
 		fi
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
 	else
 		if ! test -f /dev/urandom ; then
-			cp -nrf /dev/urandom $VPATH/$1/dev/
+			cp -nr /dev/urandom $VPATH/$1/dev/
 			cp -nrf /dev/null $VPATH/$1/dev/
 		fi
 		mount --bind --make-private $VPATH/$1/dev/ /dev/	#alternatively, set Socket with
@@ -122,11 +122,11 @@ function nmap_setup () {
 	fi
 
 	#check whether was mounted by another wrapper
-	if findmnt /dev/|grep $VPATH > /dev/null; then
+	if findmnt -nr /dev/|grep $VPATH > /dev/null; then
 		echo -ne "\n${L_ALIGN}\t${YELLOW}Warning:${RST} /dev/ already mounted."
 		if ! test -f /dev/random ; then
 			umount /dev/
-			cp -nrf /dev/random $VPATH/$1/dev/
+			cp -nr /dev/random $VPATH/$1/dev/
 			cp -nrf /dev/null $VPATH/$1/dev/
 			mount --bind --make-private $VPATH/$1/dev/ /dev/
 		fi
@@ -134,7 +134,7 @@ function nmap_setup () {
 	else	
 		if ! test -f $VPATH/$1/dev/random ; then
 			cp -nrf /dev/random $VPATH/$1/dev/		#just in case will be mounted
-			cp -nrf /dev/null $VPATH/$1/dev/
+			cp -nr /dev/null $VPATH/$1/dev/
 		fi							#by another wrapper
 	fi
 	echo -ne "${DONE_ALIGN:-}done."
@@ -144,6 +144,61 @@ function snort_setup () {
 	#shared:/var/log/; race_on: ifnet; req_files:/var/log/snort/alerts; 
 	#Just a placeholder for further developments 
 	cd .
+}
+
+function ssh_setup () {
+	#shared: /dev/pts; race_on: ; req_files:/dev/ptmx, /dev/pts/ptmx [mounted]
+
+	L_ALIGN=${L_ALIGN:="\t\t"}; unset -v DONE_ALIGN 
+	echo -ne "\n${L_ALIGN}Setup ssh wrapper on $1 ......"
+
+	if ! test -d $VPATH/$1/ ; then
+		echo -ne "\n${L_ALIGN}\tfolder $VPATH/$1/ is created."
+		mkdir $VPATH/$1
+		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
+	fi
+
+	if ! test -d $VPATH/$1/dev/ ; then
+		echo -ne "\n${L_ALIGN}\tfolder $VPATH/.../dev/ is created."
+		mkdir $VPATH/$1/dev
+		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
+	fi
+
+	if ! test -c $VPATH/$1/dev/tty ; then
+		mknod -m 666 $VPATH/$1/dev/tty c 5 0 
+		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
+	fi
+
+	if ! test -c $VPATH/$1/dev/console ; then
+		mknod -m 622 $VPATH/$1/dev/console c 5 1 
+		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
+	fi
+
+	if ! test -c $VPATH/$1/dev/ptmx ; then
+		mknod -m 666 $VPATH/$1/dev/ptmx c 5 2
+		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
+	fi
+
+	if ! test -d $VPATH/$1/dev/pts ; then
+		echo -ne "\n${L_ALIGN}\tfolder $VPATH/.../dev/pts is created."
+		mkdir $VPATH/$1/dev/pts
+		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
+	fi
+	
+	#check whether was mounted by another wrapper
+	if findmnt -rno SOURCE /dev/|grep $VPATH > /dev/null; then
+		echo -ne "\n${L_ALIGN}\t${YELLOW}Warning:${RST} /dev/ already mounted."
+		if ! findmnt -nr -o SOURCE /dev/pts|grep $VPATH > /dev/null; then
+			mount -t devpts $VPATH/$1/dev/pts /dev/pts 
+		fi
+		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
+	else
+		mount --bind --make-private $VPATH/$1/dev/ /dev/
+		if ! findmnt -nr -o SOURCE /dev/pts|grep $VPATH > /dev/null; then
+			mount -t devpts $VPATH/$1/dev/pts /dev/pts 
+		fi
+	fi
+	echo -ne "${DONE_ALIGN:-}done."
 }
 
 function strongswan_setup () {
@@ -157,7 +212,7 @@ function strongswan_setup () {
 	if ! command -v ipsec > /dev/null; then
 		echo -ne "\n${L_ALIGN}\t${RED}Error:${RST} ipsec tool not installed."
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
-		exit
+		exit 1
 	fi
 
 	#first, clone the shared folders + raced with the others wrappers
@@ -217,8 +272,8 @@ function strongswan_setup () {
 		echo -ne "\n${L_ALIGN}\t${YELLOW}Warning:${RST} /etc/ already mounted."
 		if ! test -f /etc/ipsec.conf ; then
 			umount /etc/
-			cp -nrf /etc/ipsec.conf $VPATH/$1/etc/		#bring it from installation folder
-			cp -nrf /etc/ipsec.secrets $VPATH/$1/etc/	#idem
+			cp -nr /etc/ipsec.conf $VPATH/$1/etc/		#bring it from installation folder
+			cp -nr /etc/ipsec.secrets $VPATH/$1/etc/	#idem
 			mount --bind --make-private $VPATH/$1/etc/ /etc/
 		fi
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
@@ -264,6 +319,9 @@ if [ "$2" = "setup" ]; then
 		nmap)
 			nmap_setup $1	
 			;;
+		ssh)
+			ssh_setup $1
+			;;
 		snort)
 			snort_setup $1
 			;;
@@ -287,6 +345,10 @@ elif [ "$2" = "cleanup" ]; then
 			;;
 		nmap)
 			echo -ne "\n${L_ALIGN}Clean nmap wrapper on $1 ....."
+			echo -ne "${DONE_ALIGN:-}done."
+			;;
+		ssh)
+			echo -ne "\n${L_ALIGN}Clean ssh wrapper on $1 ....."
 			echo -ne "${DONE_ALIGN:-}done."
 			;;
 		snort)

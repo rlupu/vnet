@@ -17,12 +17,12 @@
 #
 # Contact:	rlupu at elcom.pub.ro
 #
-# Version:	0.4 (Debian)
+# Version:	0.45 (Debian)
 #
 
 VPATH="/tmp/vnet"
-VTERM="screen" 		
-#VTERM="xterm"
+#VTERM="screen" 		
+VTERM="xterm"
 VHOME="$VPATH/home"
 
 RED='\e[0;31m'
@@ -36,6 +36,7 @@ function vterm ( ) {
 	else
 		echo -e "Usage:\n\tvterm <name>"
 		echo "Names: $(sudo ip netns list | cut -d ' '  -f 1 | tr '\n' ' ')" || echo "???"
+		#TODO: xterm case to be handled here
 	fi
 }
 
@@ -43,7 +44,11 @@ function ip() {
 	/sbin/ip -c $*  
 } 
 
-export -f vterm ip
+function ls() {
+	/bin/ls --color $*
+}
+
+export -f vterm ip ls
 
 export PS1='Host $'
 
