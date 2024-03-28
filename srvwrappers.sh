@@ -83,18 +83,20 @@ function rsyslog_setup () {
 
 	if findmnt -nro SOURCE /dev/|grep $VPATH > /dev/null; then
 		echo -ne "\n${L_ALIGN}\t${YELLOW}Warning:${RST} /dev/ already mounted."
-		if ! test -f /dev/urandom ; then
-			umount /dev/
-			cp -nrf /dev/urandom $VPATH/$1/dev/
-			cp -nr /dev/null $VPATH/$1/dev/
-			#mknod /dev/null c 1 3
-			mount --bind --make-private $VPATH/$1/dev/ /dev/
+		if ! test -c /dev/urandom ; then
+			#umount /dev/
+			#cp -nr /dev/urandom $VPATH/$1/dev/
+			mknod -m 444 $VPATH/$1/dev/urandom c 1 9
+			#cp -nr /dev/null $VPATH/$1/dev/
+			mknod -m 666 $VPATH/$1/dev/null c 1 3
+			#mount --bind --make-private $VPATH/$1/dev/ /dev/
 		fi
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
 	else
-		if ! test -f /dev/urandom ; then
-			cp -nr /dev/urandom $VPATH/$1/dev/
-			cp -nrf /dev/null $VPATH/$1/dev/
+		if ! test -c /dev/urandom ; then
+			#cp -nr /dev/urandom $VPATH/$1/dev/
+			mknod -m 444 $VPATH/$1/dev/urandom c 1 9
+			cp -nr /dev/null $VPATH/$1/dev/
 		fi
 		mount --bind --make-private $VPATH/$1/dev/ /dev/	#alternatively, set Socket with
 									#imuxsock module within rsyslog.conf
@@ -122,18 +124,21 @@ function nmap_setup () {
 	fi
 
 	#check whether was mounted by another wrapper
-	if findmnt -nr /dev/|grep $VPATH > /dev/null; then
+	if findmnt -nro SOURCE /dev/|grep $VPATH > /dev/null; then
 		echo -ne "\n${L_ALIGN}\t${YELLOW}Warning:${RST} /dev/ already mounted."
-		if ! test -f /dev/random ; then
-			umount /dev/
-			cp -nr /dev/random $VPATH/$1/dev/
-			cp -nrf /dev/null $VPATH/$1/dev/
-			mount --bind --make-private $VPATH/$1/dev/ /dev/
+		if ! test -c /dev/random ; then
+			#umount /dev/
+			#cp -nr /dev/random $VPATH/$1/dev/
+			mknod -m 444 $VPATH/$1/dev/random c 1 8 
+			#cp -nr /dev/null $VPATH/$1/dev/
+			mknod -m 666 $VPATH/$1/dev/null c 1 3
+			#mount --bind --make-private $VPATH/$1/dev/ /dev/
 		fi
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
 	else	
-		if ! test -f $VPATH/$1/dev/random ; then
-			cp -nrf /dev/random $VPATH/$1/dev/		#just in case will be mounted
+		if ! test -c $VPATH/$1/dev/random ; then
+			#cp -nrf /dev/random $VPATH/$1/dev/		#just in case will be mounted
+			mknod -m 444 $VPATH/$1/dev/random c 1 8 
 			cp -nr /dev/null $VPATH/$1/dev/
 		fi							#by another wrapper
 	fi
@@ -152,6 +157,12 @@ function ssh_setup () {
 	L_ALIGN=${L_ALIGN:="\t\t"}; unset -v DONE_ALIGN 
 	echo -ne "\n${L_ALIGN}Setup ssh wrapper on $1 ......"
 
+	if ! command -v ssh-askpass > /dev/null; then
+		echo -ne "\n${L_ALIGN}\t${RED}Error:${RST} ssh-askpass not installed."
+		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
+		exit 1
+	fi
+
 	if ! test -d $VPATH/$1/ ; then
 		echo -ne "\n${L_ALIGN}\tfolder $VPATH/$1/ is created."
 		mkdir $VPATH/$1
@@ -164,6 +175,7 @@ function ssh_setup () {
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
 	fi
 
+	#see tldp site for how to populate /dev
 	if ! test -c $VPATH/$1/dev/tty ; then
 		mknod -m 666 $VPATH/$1/dev/tty c 5 0 
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
@@ -173,6 +185,11 @@ function ssh_setup () {
 		mknod -m 622 $VPATH/$1/dev/console c 5 1 
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
 	fi
+
+	#if ! test -p $VPATH/$1/dev/xconsole ; then
+	#	mkfifo -m 644 $VPATH/$1/dev/xconsole 
+	#	DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
+	#fi
 
 	if ! test -c $VPATH/$1/dev/ptmx ; then
 		mknod -m 666 $VPATH/$1/dev/ptmx c 5 2
@@ -258,7 +275,7 @@ function strongswan_setup () {
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
 	fi
 
-	if findmnt /var/run/|grep $VPATH > /dev/null; then
+	if findmnt -nro SOURCE /var/run/|grep $VPATH > /dev/null; then
 		echo -ne "\n${L_ALIGN}\t\e[33mWarning:${RST} /var/run/ already mounted."
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
 	else
@@ -268,7 +285,7 @@ function strongswan_setup () {
 
 	#second, populate clone folders with req_files + mount them
 	#check whether was mounted by another wrapper
-	if findmnt /etc/|grep $VPATH > /dev/null; then
+	if findmnt -nro SOURCE /etc/|grep $VPATH > /dev/null; then
 		echo -ne "\n${L_ALIGN}\t${YELLOW}Warning:${RST} /etc/ already mounted."
 		if ! test -f /etc/ipsec.conf ; then
 			umount /etc/
@@ -295,15 +312,15 @@ function strongswan_setup () {
 		fi
 
 		if ! test -f /etc/netns/$1/ipsec.secrets ; then
-			cp -nrf /etc/ipsec.secrets /etc/netns/$1/
+			cp -nr /etc/ipsec.secrets /etc/netns/$1/
 		fi
 
 		if ! test -f $VPATH/$1/etc/ipsec.conf ; then		#just in case will be mounted
-			cp -nrf /etc/ipsec.conf $VPATH/$1/etc/		#by another wrapper 
+			cp -nr /etc/ipsec.conf $VPATH/$1/etc/		#by another wrapper instance 
 		fi
 
 		if ! test -f $VPATH/$1/etc/ipsec.secrets ; then		#just in case will be mounted
-			cp -nrf /etc/ipsec.secrets $VPATH/$1/etc/	#by another wrapper 
+			cp -nr /etc/ipsec.secrets $VPATH/$1/etc/	#by another wrapper instance
 		fi
 	fi
 
@@ -334,7 +351,7 @@ if [ "$2" = "setup" ]; then
 	esac
 
 elif [ "$2" = "cleanup" ]; then
-	L_ALIGN=${L_ALIGN:="\t\t"}; unset -v DONE_ALIGN 
+	L_ALIGN=${L_ALIGN:="\t"}; unset -v DONE_ALIGN 
 	case "$3" in
 		rsyslog)
 			echo -ne "\n${L_ALIGN}Clean rsyslog wrapper on $1 ....."

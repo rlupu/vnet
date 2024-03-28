@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) 2023, 2024 R. Lupu @ UNSTPB 
+# Copyright (C) 2023, 2024 R. Lupu @ UPB, UNSTPB 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,16 +20,22 @@
 # Version:	0.45 (Debian)
 #
 
+
+#####options setup#####
 VPATH="/tmp/vnet"
 #VTERM="screen" 		
 VTERM="xterm"
 VHOME="$VPATH/home"
+#SERVICES_WRAPPERS="rsyslog nmap ssh strongswan"
+SERVICES_WRAPPERS="nmap ssh strongswan rsyslog"
 
+#####constants definition######
 RED='\e[0;31m'
 GREEN='\e[0;32m'
 YELLOW='\e[0;33m'
 RST='\e[0m'
 
+#####vnet commands definitions#####
 function vterm ( ) {
 	if [ $# -ne 0 ]; then
 		sudo screen -r $1
@@ -50,5 +56,6 @@ function ls() {
 
 export -f vterm ip ls
 
-export PS1='Host $'
+#####vnet environment setup#####
+#export PS1='Host$'
 

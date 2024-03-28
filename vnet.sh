@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Copyright (C) 2023, 2024 R. Lupu @ UNSTPB 
+# Copyright (C) 2023, 2024 R. Lupu @ UPB, UNSTPB 
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 #
 # Contact:	rlupu at elcom.pub.ro
 #
-# Version:	0.63 (Debian)
+# Version:	0.7 (Debian)
 #
 
 
@@ -26,7 +26,7 @@
 source ./vnetenv.sh || { echo -e "Warning: vnet environment manager missing."; }
 source ./jsonparser.sh  || { echo -e "json parser not found!\nQuit."; exit 1; }
 
-#mandatory variables default values
+#mandatory options with default values
 VPATH=${VPATH:-"/tmp/vnet"}
 VTERM=${VTERM:-"screen"}
 
@@ -51,7 +51,7 @@ while getopts ":hlr" option; do
 		   echo -e "   -h\tThis help."
 		   echo -e "   -l\tList all user-defined net namespaces."
 		   echo -e "   -r\tRemove all virtual nets and terminals.\n"
-                   exit
+                   exit 0
 		   ;;
 		l) #list all existing namespaces, terms, etc.
 		   nsfound=$(ip netns list)
@@ -66,37 +66,53 @@ while getopts ":hlr" option; do
 		   if [ $(id -u) -eq 0 ]; then
 		   	screen -ls
 		   fi
-		   exit
+		   exit 0
 		   ;;
                 r) #remove the entire setup 
 		   if [ $(id -u) -ne 0 ]; then
 			echo "Should have root privileges!"
-			exit
+			exit 1
 		   fi
-		   echo -n "Removing all links, net i/f, namespaces and terms ..."
-		   for name in $(ip netns list | cut -d ' ' -f 1); do
-		   	#ip netns exec $name ip link list type veth | \
-			#	grep -zoiE "^[0-9]+[[:space:]]*:[[:space:]]*[a-z0-9]+@[a-z0-9]+[[:space:]]*" 
-		   	#ip netns exec <Router> ip link del veth0_router	<-- not required.
-		   	ip netns exec $name sysctl net.ipv4.ip_forward=0 2>&1 > /dev/null
 
-			#TODO: ctxt-based removal 
+		   #first, remove terms
+		   if [[ ${VTERM,,} == *screen* ]]; then
+		   	pkill screen; screen -wipe > /dev/null
+		   elif [[ ${VTERM,,} == *xterm* ]]; then
+		   	pkill xterm > /dev/null 
+		   fi
+
+		   echo -n "Removing all links, net i/f, namespaces and associated processes ..."
+		   for name in $(ip netns list | cut -d ' ' -f 1); do
+			#terminate per namespace processes 
+			if ! [ -z $(ip netns pids $name | tr [:cntrl:] ' ' | cut -d ' ' -f 1) ]; then
+				pkill -SIGKILL --ns $(ip netns pids $name | tr [:cntrl:] ' ' | cut -d ' ' -f 1)
+				#pkill rsyslogd  sshd snort nmap charon starter
+			fi
+
 		   	source ./srvwrappers.sh $name cleanup rsyslog
+		   	source ./srvwrappers.sh $name cleanup ssh 
 		   	source ./srvwrappers.sh $name cleanup nmap 
 
-                	#remove all namespaces
+                	#remove this namespace
                    	ip netns del $name
 		   done
-		   pkill screen; screen -wipe > /dev/null
-		   pkill xterm > /dev/null 
-		   pkill rsyslogd; pkill snort; pkill charon; pkill starter
-		   ip xfrm state flush && ip xfrm policy flush 
 
-		   #disable Internet access
-		   sysctl net.ipv4.ip_forward=0 2>&1 > /dev/null
-		   iptables -t nat -F POSTROUTING 
-                   echo "done."
-                   exit
+		   #flush ipsec xfrm
+		   read -n 1 -p "$(echo -e '\n\tFlush ipsec xfrm ? [Y/n]')" reply; reply=${reply,,}
+		   if [[ $reply = "y"  || -z $reply ]]; then
+		   	ip xfrm state flush && ip xfrm policy flush 
+		   fi
+
+		   #disable Internet access on Host
+		   read -n 1 -p "$(echo -e '\n\tDisable Host forwarding and masquerading ? [Y/n]')" reply; 
+		   reply=${reply,,}
+		   if [[ $reply = "y"  || -z $reply ]]; then
+		   	sysctl net.ipv4.ip_forward=0 2>&1 > /dev/null
+		   	iptables -t nat -F POSTROUTING 
+		   fi
+                   echo -e "\ndone."
+
+                   exit 0
 		   ;;
         esac
 done
@@ -137,6 +153,7 @@ if ! test -d $VPATH ; then
 	echo  "folder $VPATH is created."
 	mkdir $VPATH
 fi
+
 
 echo -ne "Setup and configure the virtual network entities (i.e. namespaces) ... "
 ENDPOINTS_NAMES="$(get_endpoints $1 | get_hostname)"
@@ -201,20 +218,15 @@ for name in $ENDPOINTS_NAMES; do
 			export PS1=\"$name#\"; \
 			exec bash --norc"
 	elif [[ ${VTERM,,} == *xterm* ]]; then
-		#xterm -title $name -e 'echo -e "echo 'Welcome to host!'; \
-		#	source ./vnetenv.sh;export PS1="host#"; exec bash --rcfile /etc/bash.bashrc' &
 		xterm -title $name -bg black -fg white -sl 100 -sb -rightbar -fa Monospace -fs 10 -e 	\
 			ip netns exec $name /bin/bash -c 						\
 			"echo 'Welcome to $name!'; 							\
 			export PS1='$name#';exec bash --norc" &
-		#xterm -title $name -e ip netns exec $name /bin/bash -c "exec bash" &
 	fi
 
-	#alternatively, put nsenter within bash (above) --> replace get_nsid with $$
-	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
-	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
-	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup ssh"
-	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup strongswan"
+	for service in $SERVICES_WRAPPERS; do
+		nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup $service"
+	done
 	echo -ne "\n${L_ALIGN}\t$name-term CLI......up"
 done
 #echo $LINKED
@@ -273,30 +285,11 @@ for name in $ROUTERS_NAMES; do
 			ip netns exec $name /bin/bash -c 			\
 			"echo 'Welcome to $name!'; 				\
 			export PS1='$name#';exec bash --norc" &
-		#xterm -title $name -e ip netns exec $name /bin/bash -c "exec bash" &
 	fi
 
-	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup rsyslog"
-	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup nmap"
-	nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup ssh"
-	#nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup strongswan"
-
-	#screen -dmS $name-term bash -c " \
-		#function sysctl() { /sbin/ip netns exec $name /sbin/sysctl \$* ; } ; \
-		#function arp() { /sbin/ip netns exec $name /usr/sbin/arp \$* ; } ; \
-		#function ip() { /sbin/ip netns exec $name /sbin/ip -c \$* ; } ; \
-		#function route() { /sbin/ip netns exec $name /sbin/route \$* ; } ; \
-		#function ifconfig() { /sbin/ip netns exec $name /sbin/ifconfig \$* ; } ; \
-		#function iptables() { /sbin/ip netns exec $name /sbin/iptables \$* ; } ; \
-		#function ping() { /sbin/ip netns exec $name /bin/ping \$* ; } ; \
-		#function tcpdump() { /sbin/ip netns exec $name $(which tcpdump) \$* ; } ; \
-		#function hping3() { /sbin/ip netns exec $name /usr/sbin/hping3 \$* ; } ; \
-		#function scapy3() { /sbin/ip netns exec $name /usr/bin/scapy3 \$* ; } ; \
-		#function wget() { /sbin/ip netns exec $name /usr/bin/wget \$* ; } ; \
-		#function ssh() { /sbin/ip netns exec $name /usr/bin/ssh \$* ; } ; \
-		#export -f arp sysctl ip ping route ifconfig iptables tcpdump hping3 scapy3 wget ssh; \
-		#export PS1=\"$name#\"; \
-		#bash --norc"
+	for service in $SERVICES_WRAPPERS; do
+		nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup $service"
+	done
 
 	echo -ne "\n${L_ALIGN}\t$name-term CLI......up"
 

@@ -11,7 +11,7 @@ Internet access could be enabled through masquerading (iptables) via host machin
 <ul>
 <li>rsyslog</li>
 <li>nmap</li>
-<li>ssh(to date, single daemon instance tested)</li>
+<li>ssh</li>
 <li>strongswan</li>
 <li>(more to be added)</li>
 </ul>
