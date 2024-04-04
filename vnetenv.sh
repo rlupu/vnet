@@ -17,7 +17,7 @@
 #
 # Contact:	rlupu at elcom.pub.ro
 #
-# Version:	0.45 (Debian)
+# Version:	0.5 (Debian)
 #
 
 
@@ -25,9 +25,9 @@
 VPATH="/tmp/vnet"
 #VTERM="screen" 		
 VTERM="xterm"
-VHOME="$VPATH/home"
-#SERVICES_WRAPPERS="rsyslog nmap ssh strongswan"
-SERVICES_WRAPPERS="nmap ssh strongswan rsyslog"
+VTERM_FS=12
+#services wrappers defined: rsyslog nmap ssh strongswan
+SERVICES_WRAPPERS="strongswan rsyslog"
 
 #####constants definition######
 RED='\e[0;31m'

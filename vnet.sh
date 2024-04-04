@@ -29,6 +29,7 @@ source ./jsonparser.sh  || { echo -e "json parser not found!\nQuit."; exit 1; }
 #mandatory options with default values
 VPATH=${VPATH:-"/tmp/vnet"}
 VTERM=${VTERM:-"screen"}
+VTERM_FS=${VTERM_FS:-10}
 
 function get_nsid() {
 	ppid=$(ps ax -o pid,cmd|grep -iE $VTERM.*${1}|grep -v grep|grep -oiE ^[[:space:]]*[0-9]+|tr -d [:space:])
@@ -63,9 +64,10 @@ while getopts ":hlr" option; do
 			echo "No Namespaces found."
 		   fi
 
-		   if [ $(id -u) -eq 0 ]; then
+		   if [[ ${VTERM,,} == *screen* && $(id -u) -eq 0 ]]; then
 		   	screen -ls
 		   fi
+
 		   exit 0
 		   ;;
                 r) #remove the entire setup 
@@ -86,27 +88,26 @@ while getopts ":hlr" option; do
 			#terminate per namespace processes 
 			if ! [ -z $(ip netns pids $name | tr [:cntrl:] ' ' | cut -d ' ' -f 1) ]; then
 				pkill -SIGKILL --ns $(ip netns pids $name | tr [:cntrl:] ' ' | cut -d ' ' -f 1)
-				#pkill rsyslogd  sshd snort nmap charon starter
+				#pkill rsyslogd sshd snort nmap charon starter
 			fi
 
-		   	source ./srvwrappers.sh $name cleanup rsyslog
-		   	source ./srvwrappers.sh $name cleanup ssh 
-		   	source ./srvwrappers.sh $name cleanup nmap 
+			for service in $SERVICES_WRAPPERS; do 
+		   		source ./srvwrappers.sh $name cleanup $service 
+			done
 
                 	#remove this namespace
                    	ip netns del $name
 		   done
 
 		   #flush ipsec xfrm
-		   read -n 1 -p "$(echo -e '\n\tFlush ipsec xfrm ? [Y/n]')" reply; reply=${reply,,}
-		   if [[ $reply = "y"  || -z $reply ]]; then
+		   read -n 1 -p "$(echo -e '\n\tFlush ipsec xfrm ? [Y/n]')" reply
+		   if [[ ${reply,,} = "y"  || -z $reply ]]; then
 		   	ip xfrm state flush && ip xfrm policy flush 
 		   fi
 
 		   #disable Internet access on Host
-		   read -n 1 -p "$(echo -e '\n\tDisable Host forwarding and masquerading ? [Y/n]')" reply; 
-		   reply=${reply,,}
-		   if [[ $reply = "y"  || -z $reply ]]; then
+		   read -n 1 -p "$(echo -e '\n\tDisable Host forwarding and masquerading ? [Y/n]')" reply;
+		   if [[ ${reply,,} = "y"  || -z $reply ]]; then
 		   	sysctl net.ipv4.ip_forward=0 2>&1 > /dev/null
 		   	iptables -t nat -F POSTROUTING 
 		   fi
@@ -213,23 +214,26 @@ for name in $ENDPOINTS_NAMES; do
 	echo -ne "${DONE_ALIGN:-}done."
 
 	if [[ ${VTERM,,} == *screen* ]]; then
-		screen -dmS $name-term ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
-			source ./vnetenv.sh; \
-			export PS1=\"$name#\"; \
+		screen -dmS $name-term ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; 		\
+			source ./vnetenv.sh; 									\
+			export PS1=\"$name#\"; cd ~/;								\
 			exec bash --norc"
 	elif [[ ${VTERM,,} == *xterm* ]]; then
-		xterm -title $name -bg black -fg white -sl 100 -sb -rightbar -fa Monospace -fs 10 -e 	\
-			ip netns exec $name /bin/bash -c 						\
-			"echo 'Welcome to $name!'; 							\
-			export PS1='$name#';exec bash --norc" &
+		xterm -title $name -bg black -fg white -sl 100 -sb -rightbar -fa Monospace -fs $VTERM_FS 	\
+			-e ip netns exec $name /bin/bash -c 							\
+			"echo 'Welcome to $name!'; 								\
+			export PS1='$name#'; cd ~/;								\
+			exec bash --norc" &
 	fi
 
 	for service in $SERVICES_WRAPPERS; do
-		nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup $service"
+		nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "cd $(pwd); source ./srvwrappers.sh $name setup $service"
 	done
+
 	echo -ne "\n${L_ALIGN}\t$name-term CLI......up"
 done
 #echo $LINKED
+
 
 for name in $ROUTERS_NAMES; do
 	IFS_NAMES="$(get_router_id $name $1 | get_ifnames)"
@@ -276,19 +280,20 @@ for name in $ROUTERS_NAMES; do
 	echo -ne "${DONE_ALIGN:-}done."
 
 	if [[ ${VTERM,,} == *screen* ]]; then
-		screen -dmS $name-term ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; \
-			source ./vnetenv.sh; \
-			export PS1=\"$name#\"; \
+		screen -dmS $name-term ip netns exec $name /bin/bash -c "echo 'Welcome to $name!'; 	\
+			source ./vnetenv.sh; 								\
+			export PS1=\"$name#\"; cd ~/;							\
 			exec bash --norc"
 	elif [[ ${VTERM,,} == *xterm* ]]; then
-		xterm -title $name -sl 100 -sb -rightbar -fa default -fs 10 -e 	\
-			ip netns exec $name /bin/bash -c 			\
-			"echo 'Welcome to $name!'; 				\
-			export PS1='$name#';exec bash --norc" &
+		xterm -title $name -sl 100 -sb -rightbar -fa default -fs $VTERM_FS 			\
+			-e ip netns exec $name /bin/bash -c 						\
+			"echo 'Welcome to $name!'; 							\
+			export PS1='$name#'; cd ~/; 							\
+			exec bash --norc" &
 	fi
 
 	for service in $SERVICES_WRAPPERS; do
-		nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "source ./srvwrappers.sh $name setup $service"
+		nsenter -n -m -w -t $(get_nsid ${name}) /bin/bash -c "cd $(pwd); source ./srvwrappers.sh $name setup $service"
 	done
 
 	echo -ne "\n${L_ALIGN}\t$name-term CLI......up"

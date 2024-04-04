@@ -23,6 +23,8 @@
 #
 
 source ./vnetenv.sh || { echo -e "Env not settled.\nQuit."; exit 1; }
+VPATH=${VPATH:-"/tmp/vnet"}
+
 
 function rsyslog_setup () {
 	#shared:/var/log/ /var/run/ /run/ /dev/; race_on:/var/run/rsyslog.pid /var/log/syslog /dev/log [ifnet]; 
@@ -290,9 +292,15 @@ function strongswan_setup () {
 		if ! test -f /etc/ipsec.conf ; then
 			umount /etc/
 			cp -nr /etc/ipsec.conf $VPATH/$1/etc/		#bring it from installation folder
+			mount --bind --make-private $VPATH/$1/etc/ /etc/
+		fi
+
+		if ! test -f /etc/ipsec.secrets ; then
+			umount /etc/
 			cp -nr /etc/ipsec.secrets $VPATH/$1/etc/	#idem
 			mount --bind --make-private $VPATH/$1/etc/ /etc/
 		fi
+
 		DONE_ALIGN=${DONE_ALIGN:="\n${L_ALIGN}"}
 	else
 		if ! test -d /etc/netns/ ; then
@@ -321,6 +329,26 @@ function strongswan_setup () {
 
 		if ! test -f $VPATH/$1/etc/ipsec.secrets ; then		#just in case will be mounted
 			cp -nr /etc/ipsec.secrets $VPATH/$1/etc/	#by another wrapper instance
+		fi
+
+		if ! test -d /etc/netns/$1/ipsec.d/ ; then
+			mkdir -m 755 /etc/netns/$1/ipsec.d
+			mkdir -m 700 /etc/netns/$1/ipsec.d/private
+			mkdir -m 755 /etc/netns/$1/ipsec.d/certs
+			mkdir -m 755 /etc/netns/$1/ipsec.d/cacerts
+
+		else 
+			if ! test -d /etc/netns/$1/ipsec.d/private ; then
+				mkdir -m 700 /etc/netns/$1/ipsec.d/private
+			fi
+
+			if ! test -d /etc/netns/$1/ipsec.d/certs ; then
+				mkdir -m 700 /etc/netns/$1/ipsec.d/certs
+			fi
+
+			if ! test -d /etc/netns/$1/ipsec.d/cacerts ; then
+				mkdir -m 700 /etc/netns/$1/ipsec.d/cacerts
+			fi
 		fi
 	fi
 
